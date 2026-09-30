@@ -1,0 +1,98 @@
+# 把已构建好的 globecore HAR 发布到 OpenHarmony 三方库中心仓（ohpm）。
+#
+# 设计取舍：HAR 内含静态链接 GDAL/PROJ/libcurl 的 native .so，在 CI 里从零编译不现实，
+# 因此 **构建在本地完成**（`hvigorw ... createVersionedHar`，release 模式），产出的
+# `@zys-globecore-<version>.har` 作为附件上传到对应 GitHub Release；本工作流只负责把
+# Release 上现成的 .har 通过 `ohpm publish` 推到中心仓，runner 上仅需 ohpm CLI（无 SDK / native 工具链）。
+#
+# 触发：发布（或编辑）一个携带 .har 附件的 GitHub Release 时自动跑；也可手动。
+#
+# 需要的仓库 Secrets（Settings → Secrets and variables → Actions）：
+#   OHPM_PUBLISH_ID      ohpm 个人中心头像下方的发布码
+#   OHPM_KEY             SSH 私钥文件完整内容（-----BEGIN RSA PRIVATE KEY----- 开头，PEM 格式）
+#   OHPM_KEY_PASSPHRASE  生成该私钥时设置的 passphrase（非空）
+#
+# 前置：`zys` 组织已在 ohpm「组织管理」创建并通过认证，且当前发布账号是其 developer。
+#
+# ⚠️ 首次启用请按实际报错微调（ohpm CLI 版本 / prompt 文案可能随版本变化）。
+name: Publish HAR to ohpm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "携带 .har 附件的 GitHub Release tag（如 v0.1.1）"
+        required: true
+        default: "v0.1.1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-ohpm
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install ohpm CLI (headless, publish-only)
+        run: npm install -g @ohos/ohpm-cli && ohpm -v
+
+      - name: Configure ohpm publish registry
+        run: ohpm config set publish_registry https://ohpm.openharmony.cn/ohpm/
+
+      - name: Download HAR from Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: har
+        run: |
+          gh release download "${{ steps.tag.outputs.tag }}" --clobber --pattern "*.har"
+          HAR_FILE="$(ls -1 ./*.har | head -1)"
+          if [ -z "$HAR_FILE" ]; then
+            echo "ERROR: no .har asset found on release ${{ steps.tag.outputs.tag }}" >&2
+            exit 1
+          fi
+          echo "har=$HAR_FILE" >> "$GITHUB_OUTPUT"
+          echo "Publishing: $HAR_FILE"
+
+      - name: Write SSH private key from secret
+        run: |
+          printf '%s\n' "${{ secrets.OHPM_KEY }}" > "$RUNNER_TEMP/ohpm_key"
+          chmod 600 "$RUNNER_TEMP/ohpm_key"
+
+      - name: Publish to OpenHarmony ohpm (feed passphrase via expect)
+        env:
+          OHPM_PUBLISH_ID: ${{ secrets.OHPM_PUBLISH_ID }}
+          OHPM_KEY_PASSPHRASE: ${{ secrets.OHPM_KEY_PASSPHRASE }}
+          HAR: ${{ steps.har.outputs.har }}
+        run: |
+          sudo apt-get update && sudo apt-get install -y expect
+          expect <<'EOF'
+            set timeout 300
+            spawn ohpm publish $env(HAR) --publish_id $env(OHPM_PUBLISH_ID) --key_path $env(RUNNER_TEMP)/ohpm_key
+            expect {
+              -re "(?i)passphrase"  { send "$env(OHPM_KEY_PASSPHRASE)\r"; exp_continue }
+              -re "(?i)source code" { send "y\r"; exp_continue }
+              -re "(?i)password"    { send "$env(OHPM_KEY_PASSPHRASE)\r"; exp_continue }
+              eof
+            }
+            catch wait result
+            exit [lindex $result 3]
+          EOF

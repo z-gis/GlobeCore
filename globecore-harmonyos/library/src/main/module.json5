@@ -1,6 +1,6 @@
 {
   "module": {
-    "name": "library",
+    "name": "globecore",
     "type": "har",
     "deviceTypes": [
       "phone",

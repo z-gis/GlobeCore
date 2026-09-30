@@ -13,7 +13,7 @@ import { common } from '@kit.AbilityKit';
 import fs from '@ohos.file.fs';
 import {
   NativeMapView, ViewMode, Camera, Position, VectorStyle, PickResult, FeatureGeometry,
-} from 'globecore-harmonyos';
+} from '@zys/globecore';
 
 const DEMO_TAG: string = 'MapDemoPage';
 

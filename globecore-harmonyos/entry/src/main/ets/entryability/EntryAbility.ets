@@ -1,7 +1,7 @@
 import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
-import { NativeSrs, NativeNet } from 'globecore-harmonyos';
+import { NativeSrs, NativeNet } from '@zys/globecore';
 
 const TAG: string = 'EntryAbility';
 const DOMAIN: number = 0x8811;

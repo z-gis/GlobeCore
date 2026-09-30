@@ -1,12 +1,12 @@
 {
   "name": "entry",
-  "version": "1.1.0",
+  "version": "0.1.1",
   "description": "globecore-harmonyos 演示入口（对齐 Android globecore-android 演示 App）",
   "main": "",
   "author": "zys",
   "license": "Apache-2.0",
   "dependencies": {
     // HAR 门面模块（ArkTS 类经其内部 import 'libglobecore.so'）
-    "globecore-harmonyos": "file:../library"
+    "@zys/globecore": "file:../library"
   }
 }

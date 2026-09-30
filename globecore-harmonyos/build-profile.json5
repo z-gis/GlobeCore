@@ -39,7 +39,7 @@
       ]
     },
     {
-      "name": "library",
+      "name": "globecore",
       "srcPath": "./library"
     }
   ]
