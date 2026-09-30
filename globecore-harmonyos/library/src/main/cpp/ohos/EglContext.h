@@ -23,7 +23,7 @@
 
 namespace globecore { class GlobeEngine; }
 
-namespace wwohos {
+namespace gcohos {
 
 /// EGL display + window surface + GLES2 context 的轻量封装。
 /// 全部方法须在拥有该上下文的线程（MapRenderHost 渲染线程）调用，destroy() 同。
@@ -146,6 +146,6 @@ private:
     std::function<void(float, float)> longPressCb_;
 };
 
-} // namespace wwohos
+} // namespace gcohos
 
 #endif // GLOBECORE_OHOS_EGLCONTEXT_H

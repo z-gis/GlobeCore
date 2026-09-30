@@ -17,7 +17,7 @@
 
 #include <napi/native_api.h>
 
-namespace wwohos {
+namespace gcohos {
 
 // ── 参数读取 ──
 
@@ -178,6 +178,6 @@ inline void NapiGetArgs(napi_env env, napi_callback_info info, size_t argc, napi
     for (size_t i = actual; i < argc; ++i) args[i] = nullptr;
 }
 
-} // namespace wwohos
+} // namespace gcohos
 
 #endif // GLOBECORE_OHOS_NAPI_UTIL_H

@@ -1,6 +1,6 @@
 // NativeSrs.ets —— PROJ 坐标转换门面（对应 Android NativeSrs.kt）。
 //
-// 符号实现见引擎 bridge/srs.cpp 的 wwbridge 核心 + ohos/napi_srs.cpp NAPI 导出。
+// 符号实现见引擎 bridge/srs.cpp 的 gcbridge 核心 + ohos/napi_srs.cpp NAPI 导出。
 // PROJ 数据（proj.db 与格网改正数）随本 HAR 的 resources/rawfile/proj 分发
 // （build-scripts --target ohos 的 install_proj_data 落位，与 Android assets/proj 同源），
 // 宿主启动时调一次 initProjData(context) 即完成沙箱解压与搜索路径配置。

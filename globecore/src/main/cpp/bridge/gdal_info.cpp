@@ -8,7 +8,7 @@
 
 // ==================== GDAL 版本信息与驱动清单（NativeLayerInfo 门面） ====================
 
-namespace wwbridge {
+namespace gcbridge {
 
 std::string gdalVersion() {
     GDALAllRegister();
@@ -34,7 +34,7 @@ std::string vectorDrivers() {
     return result;
 }
 
-} // namespace wwbridge
+} // namespace gcbridge
 
 // ── Android JNI 导出薄封装 ──
 #if !defined(__OHOS__)
@@ -43,14 +43,14 @@ std::string vectorDrivers() {
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_zys_globecore_NativeLayerInfo_getGdalVersion(JNIEnv *env, jobject /*thiz*/) {
-    const std::string v = wwbridge::gdalVersion();
+    const std::string v = gcbridge::gdalVersion();
     return env->NewStringUTF(v.c_str());
 }
 
 extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_zys_globecore_NativeLayerInfo_getVectorDrivers(JNIEnv *env, jobject /*thiz*/) {
-    const std::string d = wwbridge::vectorDrivers();
+    const std::string d = gcbridge::vectorDrivers();
     return env->NewStringUTF(d.c_str());
 }
 

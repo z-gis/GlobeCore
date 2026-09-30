@@ -11,7 +11,7 @@
 #include "core/GlobeEngine.h"
 #include "util/Log.h"
 
-namespace wwohos {
+namespace gcohos {
 
 // ── 组件 → 桥实例注册表（静态回调只带 component 指针，据此反查）──
 std::mutex XComponentBridge::s_registryMtx;
@@ -374,4 +374,4 @@ void XComponentBridge::handleLongPress(float xVp, float yVp) {
     (void) yVp;
 }
 
-} // namespace wwohos
+} // namespace gcohos

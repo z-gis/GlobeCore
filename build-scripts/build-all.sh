@@ -36,13 +36,13 @@ export TARGET
 if [ "$TARGET" = "ohos" ]; then
   ABIS=(arm64-v8a x86_64)   # 鸿蒙真机 arm64；x86_64 供 DevEco 模拟器
   API=12                    # OHOS 编译 API level（HarmonyOS NEXT API 12）
-  WW_PFX="-ohos"            # export 前缀目录后缀，与 android 产物隔离
+  GC_PFX="-ohos"            # export 前缀目录后缀，与 android 产物隔离
 else
   ABIS=(x86_64 arm64-v8a)
   API=24
-  WW_PFX=""                 # android 路径保持零变化（复用既有 export 缓存）
+  GC_PFX=""                 # android 路径保持零变化（复用既有 export 缓存）
 fi
-export API WW_PFX
+export API GC_PFX
 
 # 构建工作区根：放 ndk/、cmake/、export/、third-party/ 等子目录；默认即脚本目录，可环境变量覆盖
 # WSL 且脚本位于 Windows 挂载盘（/mnt/<盘>，9p/drvfs）时：NDK/cmake 解压出的符号链接与可执行位
@@ -113,7 +113,7 @@ LIBS=(libgdal.a libproj.a libsqlite3.a libkmlbase.a libkmldom.a libkmlengine.a \
 # build_one_abi <ABI>：按依赖顺序构建全部第三方库 + GDAL，产物安装到 $PREFIX/lib
 build_one_abi() {
   export ABI=$1
-  export PREFIX=$EXPORT_DIR/third_party$WW_PFX-$ABI
+  export PREFIX=$EXPORT_DIR/third_party$GC_PFX-$ABI
 
   # 子脚本（source 进本函数）以 $MAIN_DIR 作为源码工作区；用 local 把它临时指向 third-party
   # （bash 动态作用域，函数返回后自动恢复全局 MAIN_DIR），使所有 tarball 下载/解压/构建都落在
@@ -122,8 +122,8 @@ build_one_abi() {
 
   # 目标三元组/编译器/工具链参数按 TARGET 分派。导出统一契约供子脚本使用：
   #   HOST/CC/CXX/AR/CFLAGS...  —— autotools/configure 类（sqlite3、openssl、minizip 直编）
-  #   WW_CMAKE_TARGET_ARGS      —— CMake 类库的目标工具链参数（toolchain 文件 + ABI 等）
-  #   WW_SYSROOT_USR            —— 三方库查找用的 sysroot/usr 前缀（proj/gdal 的 PREFIX_PATH）
+  #   GC_CMAKE_TARGET_ARGS      —— CMake 类库的目标工具链参数（toolchain 文件 + ABI 等）
+  #   GC_SYSROOT_USR            —— 三方库查找用的 sysroot/usr 前缀（proj/gdal 的 PREFIX_PATH）
   #   HOST_CONFIGURE            —— configure --host 三元组（ohos 用 *-unknown-linux-musl 兼容老 config.sub）
   if [ "$TARGET" = "ohos" ]; then
     case "$ABI" in
@@ -132,28 +132,28 @@ build_one_abi() {
       *) echo "Unsupported OHOS ABI: $ABI"; exit 1 ;;
     esac
     # sysroot 根由 ndk.sh 自适应解析导出（统一布局 <native>/sysroot；旧布局 <native>/llvm/sysroot/<triple>）
-    local OHOS_SYSROOT="${WW_OHOS_SYSROOT:-$TOOLCHAIN/sysroot/$HOST}"
+    local OHOS_SYSROOT="${GC_OHOS_SYSROOT:-$TOOLCHAIN/sysroot/$HOST}"
     # 老 autotools 的 config.sub 不认识 *-linux-ohos；OHOS 实为 musl libc，
     # 用 *-unknown-linux-musl 作 configure --host（仅影响工具选择，编译器已显式指定）
     export HOST_CONFIGURE="${HOST%%-linux-ohos}-unknown-linux-musl"
     # CC/CXX 需携带 --target/--sysroot；多词命令会碰碎子脚本里 "$CC" 直调，
     # 故生成单文件 sh wrapper 作为 CC/CXX 入口（C++ 统一 std=gnu++17）
-    local WW_BIN="$MAIN_DIR/.bin"
-    mkdir -p "$WW_BIN"
+    local GC_BIN="$MAIN_DIR/.bin"
+    mkdir -p "$GC_BIN"
     printf '#!/bin/sh\nexec "%s/bin/clang" --target=%s --sysroot=%s "$@"\n' \
-      "$TOOLCHAIN" "$HOST" "$OHOS_SYSROOT" > "$WW_BIN/ohos-cc-$ABI"
+      "$TOOLCHAIN" "$HOST" "$OHOS_SYSROOT" > "$GC_BIN/ohos-cc-$ABI"
     printf '#!/bin/sh\nexec "%s/bin/clang++" --target=%s --sysroot=%s -std=gnu++17 "$@"\n' \
-      "$TOOLCHAIN" "$HOST" "$OHOS_SYSROOT" > "$WW_BIN/ohos-cxx-$ABI"
-    chmod +x "$WW_BIN/ohos-cc-$ABI" "$WW_BIN/ohos-cxx-$ABI"
-    export CC="$WW_BIN/ohos-cc-$ABI"
-    export CXX="$WW_BIN/ohos-cxx-$ABI"
+      "$TOOLCHAIN" "$HOST" "$OHOS_SYSROOT" > "$GC_BIN/ohos-cxx-$ABI"
+    chmod +x "$GC_BIN/ohos-cc-$ABI" "$GC_BIN/ohos-cxx-$ABI"
+    export CC="$GC_BIN/ohos-cc-$ABI"
+    export CXX="$GC_BIN/ohos-cxx-$ABI"
     export AR="$TOOLCHAIN/bin/llvm-ar" RANLIB="$TOOLCHAIN/bin/llvm-ranlib" \
            NM="$TOOLCHAIN/bin/llvm-nm" STRIP="$TOOLCHAIN/bin/llvm-strip"
     export CFLAGS="-fPIC"
     export CXXFLAGS="-fPIC"
     export LDFLAGS="-fPIC"
-    export WW_CMAKE_TARGET_ARGS="-DCMAKE_TOOLCHAIN_FILE=$OHOS_NATIVE/build/cmake/ohos.toolchain.cmake -DOHOS_ARCH=$ABI -DOHOS_STL=c++_static -DCMAKE_BUILD_TYPE=Release"
-    export WW_SYSROOT_USR="$OHOS_SYSROOT/usr"
+    export GC_CMAKE_TARGET_ARGS="-DCMAKE_TOOLCHAIN_FILE=$OHOS_NATIVE/build/cmake/ohos.toolchain.cmake -DOHOS_ARCH=$ABI -DOHOS_STL=c++_static -DCMAKE_BUILD_TYPE=Release"
+    export GC_SYSROOT_USR="$OHOS_SYSROOT/usr"
     # DevEco 官方 toolchain 靠这两个变量定位 SDK
     export OHOS_NDK_HOME="$OHOS_NATIVE" OHOS_SDK_NATIVE="$OHOS_NATIVE"
   else
@@ -174,8 +174,8 @@ build_one_abi() {
     export CFLAGS="--sysroot=$TOOLCHAIN/sysroot -fPIC"
     export CXXFLAGS="--sysroot=$TOOLCHAIN/sysroot -fPIC"
     export LDFLAGS="-fPIC"
-    export WW_CMAKE_TARGET_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI=$ABI -DANDROID_PLATFORM=android-$API"
-    export WW_SYSROOT_USR="$TOOLCHAIN/sysroot/usr/"
+    export GC_CMAKE_TARGET_ARGS="-DCMAKE_TOOLCHAIN_FILE=$NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI=$ABI -DANDROID_PLATFORM=android-$API"
+    export GC_SYSROOT_USR="$TOOLCHAIN/sysroot/usr/"
   fi
 
   echo "==================== BUILD ABI=$ABI ===================="
@@ -238,8 +238,8 @@ build_one_abi() {
     PKG_CONFIG_LIBDIR=$PREFIX/lib/pkgconfig cmake .. \
      -DUSE_CCACHE=OFF \
      -DCMAKE_INSTALL_PREFIX=$PREFIX \
-     $WW_CMAKE_TARGET_ARGS \
-     "-DCMAKE_PREFIX_PATH=$PREFIX;$WW_SYSROOT_USR" \
+     $GC_CMAKE_TARGET_ARGS \
+     "-DCMAKE_PREFIX_PATH=$PREFIX;$GC_SYSROOT_USR" \
      -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=NEVER \
      -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=NEVER \
      -DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=NO \
@@ -281,7 +281,7 @@ build_one_abi() {
    -DCMAKE_ANDROID_NDK=$NDK_ROOT\
    -DCMAKE_ANDROID_ARCH_ABI=$ABI \
    -DCMAKE_SYSTEM_VERSION=$API \
-   "-DCMAKE_PREFIX_PATH=$PREFIX;$WW_SYSROOT_USR" \
+   "-DCMAKE_PREFIX_PATH=$PREFIX;$GC_SYSROOT_USR" \
    -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=NEVER \
    -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=NEVER \
    -DCMAKE_FIND_USE_CMAKE_SYSTEM_PATH=NO \
@@ -320,7 +320,7 @@ build_one_abi() {
 # install_one_abi <ABI>：把 $PREFIX/lib 下产出的 .a 直接拷进 $JNI_LIBS_DIR/<abi>/（正确位置）
 install_one_abi() {
   export ABI=$1
-  export PREFIX=$EXPORT_DIR/third_party$WW_PFX-$ABI
+  export PREFIX=$EXPORT_DIR/third_party$GC_PFX-$ABI
   local dest="$JNI_LIBS_DIR/$ABI"
   mkdir -p "$dest"
 
@@ -339,7 +339,7 @@ install_one_abi() {
 #   子目录布局与代码 #include 约定一致：gdal/ proj/ sqlite/ curl/ openssl/ + 根 zlib.h/zconf.h；
 #   stb/、earcut.cpp 属仓库自带基线（见 include/ 初始化），不在刷新范围。
 install_headers() {
-  local src=$EXPORT_DIR/third_party$WW_PFX-${ABIS[0]}/include
+  local src=$EXPORT_DIR/third_party$GC_PFX-${ABIS[0]}/include
   local dst=$REPO_ROOT/globecore/src/main/cpp/include
   [ -d "$src" ] || { echo "[headers] 跳过：$src 不存在"; return 0; }
   mkdir -p "$dst"
@@ -367,7 +367,7 @@ install_headers() {
 # 由本步骤在构建时生成；PROJ 数据与架构无关，取首个 ABI 前缀即可。
 # 落位：android → globecore assets；ohos → globecore-harmonyos HAR rawfile。
 install_proj_data() {
-  local src=$EXPORT_DIR/third_party$WW_PFX-${ABIS[0]}/share/proj
+  local src=$EXPORT_DIR/third_party$GC_PFX-${ABIS[0]}/share/proj
   local dst
   if [ "$TARGET" = "ohos" ]; then
     dst=$REPO_ROOT/globecore-harmonyos/library/src/main/resources/rawfile/proj

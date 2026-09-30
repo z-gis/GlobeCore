@@ -1,12 +1,12 @@
 // napi_init.cpp —— libglobecore 模块注册（对应 Android JNI_OnLoad：JNI 按符号名自动绑定，
 // NAPI 需显式把导出挂到模块 exports 对象）。
 //
-// entry 侧 import 路径：import ww from 'libglobecore'（oh-package.json5 依赖
+// entry 侧 import 路径：import gc from 'libglobecore'（oh-package.json5 依赖
 // "libglobecore": "file:../library"），模块名须与 nm_modname 一致。
 #include <napi/native_api.h>
 #include <ace/xcomponent/native_interface_xcomponent.h>
 
-namespace wwohos {
+namespace gcohos {
 
 // ── 各分组注册函数 ──
 napi_value RegisterGlobeEngine(napi_env env, napi_value exports);
@@ -56,13 +56,13 @@ napi_value Init(napi_env env, napi_value exports) {
 
 } // namespace
 
-} // namespace wwohos
+} // namespace gcohos
 
 static napi_module globeCoreModule = {
     .nm_version = 1,
     .nm_flags = 0,
     .nm_filename = nullptr,
-    .nm_register_func = wwohos::Init,
+    .nm_register_func = gcohos::Init,
     .nm_modname = "globecore",
     .nm_priv = nullptr,
     .reserved = { nullptr },

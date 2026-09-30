@@ -10,7 +10,7 @@
 //  - 数组类型：double[] ↔ Float64Array、ARGB 像素 ↔ Int32Array（napi_util.h 口径），
 //    本门面统一做 number[] ↔ TypedArray 归一，宿主只见普通数组；
 //  - bridge 三组符号（PROJ/GDAL 元信息/矢量 IO）并入同一模块（Android 分为三个 JNI 门面类）。
-import ww from 'libglobecore.so';
+import gc from 'libglobecore.so';
 import common from '@ohos.app.ability.common';
 import fs from '@ohos.file.fs';
 
@@ -64,7 +64,7 @@ export class NativeLib {
     }
     try {
       // import 顶层绑定即触发 dlopen + napi_module_register；此处触碰一次验证可用
-      const ok: boolean = typeof ww.nativeCreate === 'function';
+      const ok: boolean = typeof gc.nativeCreate === 'function';
       if (!ok) {
         NativeLib.loadFailed = true;
         console.error(`${TAG}: libglobecore.so nativeCreate 缺失`);
@@ -86,13 +86,13 @@ export class NativeLib {
     if (!NativeLib.ensureLoaded()) {
       return 0;
     }
-    return ww.nativeCreate();
+    return gc.nativeCreate();
   }
 
   /** 销毁 native GlobeEngine 实例（未 detach 的桥由 native 侧安全网先行拆除） */
   static nativeDestroy(handle: number): void {
     if (handle !== 0) {
-      ww.nativeDestroy(handle);
+      gc.nativeDestroy(handle);
     }
   }
 
@@ -101,20 +101,20 @@ export class NativeLib {
     if (handle === 0) {
       return false;
     }
-    return ww.nativeAttach(handle, surfaceId, width, height);
+    return gc.nativeAttach(handle, surfaceId, width, height);
   }
 
   /** 解绑 surface：停渲染线程并注销回调，GlobeEngine 数据态保留（可再 attach） */
   static nativeDetach(handle: number): void {
     if (handle !== 0) {
-      ww.nativeDetach(handle);
+      gc.nativeDetach(handle);
     }
   }
 
   /** 请求一帧重绘（对应 Kotlin view.requestRender()；surface 未就绪时忽略） */
   static nativeRequestRender(handle: number): void {
     if (handle !== 0) {
-      ww.nativeRequestRender(handle);
+      gc.nativeRequestRender(handle);
     }
   }
 
@@ -124,7 +124,7 @@ export class NativeLib {
     altitudeMeters: number, headingDeg: number, tiltDeg: number, rollDeg: number,
     fieldOfViewDeg: number, altitudeMode: number): void {
     if (handle !== 0) {
-      ww.nativeSetCamera(handle, latitudeDeg, longitudeDeg, altitudeMeters,
+      gc.nativeSetCamera(handle, latitudeDeg, longitudeDeg, altitudeMeters,
         headingDeg, tiltDeg, rollDeg, fieldOfViewDeg, altitudeMode);
     }
   }
@@ -134,12 +134,12 @@ export class NativeLib {
     if (handle === 0) {
       return null;
     }
-    return toIntArray(ww.nativeGetCamera(handle));
+    return toIntArray(gc.nativeGetCamera(handle));
   }
 
   static nativeSetViewMode(handle: number, mode: number): void {
     if (handle !== 0) {
-      ww.nativeSetViewMode(handle, mode);
+      gc.nativeSetViewMode(handle, mode);
     }
   }
 
@@ -147,30 +147,30 @@ export class NativeLib {
     if (handle === 0) {
       return 0;
     }
-    return ww.nativeGetViewMode(handle);
+    return gc.nativeGetViewMode(handle);
   }
 
   static nativePanBy(handle: number, dxPx: number, dyPx: number): void {
     if (handle !== 0) {
-      ww.nativePanBy(handle, dxPx, dyPx);
+      gc.nativePanBy(handle, dxPx, dyPx);
     }
   }
 
   static nativeZoomBy(handle: number, factor: number, focusXpx: number, focusYpx: number): void {
     if (handle !== 0) {
-      ww.nativeZoomBy(handle, factor, focusXpx, focusYpx);
+      gc.nativeZoomBy(handle, factor, focusXpx, focusYpx);
     }
   }
 
   static nativeRotateHeading(handle: number, deltaDeg: number): void {
     if (handle !== 0) {
-      ww.nativeRotateHeading(handle, deltaDeg);
+      gc.nativeRotateHeading(handle, deltaDeg);
     }
   }
 
   static nativeRotateTilt(handle: number, deltaDeg: number): void {
     if (handle !== 0) {
-      ww.nativeRotateTilt(handle, deltaDeg);
+      gc.nativeRotateTilt(handle, deltaDeg);
     }
   }
 
@@ -179,13 +179,13 @@ export class NativeLib {
   static nativeAddTileLayer(handle: number, cacheDir: string, urlTemplate: string,
     maxLevel: number, overlay: boolean): void {
     if (handle !== 0) {
-      ww.nativeAddTileLayer(handle, cacheDir, urlTemplate, maxLevel, overlay);
+      gc.nativeAddTileLayer(handle, cacheDir, urlTemplate, maxLevel, overlay);
     }
   }
 
   static nativeSetLayerVisible(handle: number, index: number, visible: boolean): void {
     if (handle !== 0) {
-      ww.nativeSetLayerVisible(handle, index, visible);
+      gc.nativeSetLayerVisible(handle, index, visible);
     }
   }
 
@@ -193,7 +193,7 @@ export class NativeLib {
     if (handle === 0) {
       return -1;
     }
-    return ww.nativeAddRasterLayer(handle, cacheDir, path);
+    return gc.nativeAddRasterLayer(handle, cacheDir, path);
   }
 
   // ── 矢量图层 ──
@@ -211,7 +211,7 @@ export class NativeLib {
     if (handle === 0) {
       return -1;
     }
-    return ww.nativeAddVectorLayer(handle, path,
+    return gc.nativeAddVectorLayer(handle, path,
       toInt32(fillColor), toInt32(outlineColor), outlineWidth,
       toInt32(lineColor), lineWidth,
       toInt32(pointColor), pointRadiusDp,
@@ -224,7 +224,7 @@ export class NativeLib {
   static nativeUpdateVectorExtent(handle: number, index: number, hasExtent: boolean,
     minLon: number, minLat: number, maxLon: number, maxLat: number, maxFeatures: number): void {
     if (handle !== 0) {
-      ww.nativeUpdateVectorExtent(handle, index, hasExtent, minLon, minLat, maxLon, maxLat, maxFeatures);
+      gc.nativeUpdateVectorExtent(handle, index, hasExtent, minLon, minLat, maxLon, maxLat, maxFeatures);
     }
   }
 
@@ -232,18 +232,18 @@ export class NativeLib {
     if (handle === 0) {
       return false;
     }
-    return ww.nativeHasVectorLoading(handle);
+    return gc.nativeHasVectorLoading(handle);
   }
 
   static nativeSetVectorLayerVisible(handle: number, index: number, visible: boolean): void {
     if (handle !== 0) {
-      ww.nativeSetVectorLayerVisible(handle, index, visible);
+      gc.nativeSetVectorLayerVisible(handle, index, visible);
     }
   }
 
   static nativeSetVectorMinLevel(handle: number, index: number, minLevel: number): void {
     if (handle !== 0) {
-      ww.nativeSetVectorMinLevel(handle, index, minLevel);
+      gc.nativeSetVectorMinLevel(handle, index, minLevel);
     }
   }
 
@@ -251,12 +251,12 @@ export class NativeLib {
     if (handle === 0) {
       return 0;
     }
-    return ww.nativeGetCameraZoomLevel(handle);
+    return gc.nativeGetCameraZoomLevel(handle);
   }
 
   static nativeRemoveVectorLayer(handle: number, index: number): void {
     if (handle !== 0) {
-      ww.nativeRemoveVectorLayer(handle, index);
+      gc.nativeRemoveVectorLayer(handle, index);
     }
   }
 
@@ -272,7 +272,7 @@ export class NativeLib {
     if (handle === 0) {
       return -1;
     }
-    return ww.nativeAddOverlayLayer(handle,
+    return gc.nativeAddOverlayLayer(handle,
       toInt32(fillColor), toInt32(outlineColor), outlineWidth,
       toInt32(lineColor), lineWidth,
       toInt32(pointColor), pointRadiusDp,
@@ -284,7 +284,7 @@ export class NativeLib {
   static nativeUpdateOverlayPoints(handle: number, index: number, lonlat: number[],
     fids: number[] | undefined | null, labels: string[] | undefined | null): void {
     if (handle !== 0) {
-      ww.nativeUpdateOverlayPoints(handle, index, toFloat64Array(lonlat),
+      gc.nativeUpdateOverlayPoints(handle, index, toFloat64Array(lonlat),
         toFloat64Array(fids), labels);
     }
   }
@@ -292,7 +292,7 @@ export class NativeLib {
   static nativeUpdateOverlayLines(handle: number, index: number, lonlat: number[],
     vertexCounts: number[], fids: number[] | undefined | null, labels: string[] | undefined | null): void {
     if (handle !== 0) {
-      ww.nativeUpdateOverlayLines(handle, index, toFloat64Array(lonlat),
+      gc.nativeUpdateOverlayLines(handle, index, toFloat64Array(lonlat),
         toFloat64Array(vertexCounts), toFloat64Array(fids), labels);
     }
   }
@@ -301,7 +301,7 @@ export class NativeLib {
     ringVertexCounts: number[], ringsPerFeature: number[],
     fids: number[] | undefined | null, labels: string[] | undefined | null): void {
     if (handle !== 0) {
-      ww.nativeUpdateOverlayPolygons(handle, index, toFloat64Array(lonlat),
+      gc.nativeUpdateOverlayPolygons(handle, index, toFloat64Array(lonlat),
         toFloat64Array(ringVertexCounts), toFloat64Array(ringsPerFeature),
         toFloat64Array(fids), labels);
     }
@@ -309,19 +309,19 @@ export class NativeLib {
 
   static nativeRemoveOverlayLayer(handle: number, index: number): void {
     if (handle !== 0) {
-      ww.nativeRemoveOverlayLayer(handle, index);
+      gc.nativeRemoveOverlayLayer(handle, index);
     }
   }
 
   static nativeSetOverlayNoPick(handle: number, index: number, noPick: boolean): void {
     if (handle !== 0) {
-      ww.nativeSetOverlayNoPick(handle, index, noPick);
+      gc.nativeSetOverlayNoPick(handle, index, noPick);
     }
   }
 
   static nativeClearOverlayLayers(handle: number): void {
     if (handle !== 0) {
-      ww.nativeClearOverlayLayers(handle);
+      gc.nativeClearOverlayLayers(handle);
     }
   }
 
@@ -332,13 +332,13 @@ export class NativeLib {
     if (handle === 0) {
       return null;
     }
-    return toIntArray(ww.nativePickVector(handle, sxPx, syPx));
+    return toIntArray(gc.nativePickVector(handle, sxPx, syPx));
   }
 
   /** 注册单击拾取回调（事件源 native 手势识别，坐标 vp）；传 null 反注册 */
   static nativeSetTapCallback(handle: number, callback: ((x: number, y: number) => void) | null): void {
     if (handle !== 0) {
-      ww.nativeSetTapCallback(handle, callback);
+      gc.nativeSetTapCallback(handle, callback);
     }
   }
 
@@ -347,7 +347,7 @@ export class NativeLib {
     if (handle === 0) {
       return null;
     }
-    return toIntArray(ww.nativeScreenToGeo(handle, sxPx, syPx));
+    return toIntArray(gc.nativeScreenToGeo(handle, sxPx, syPx));
   }
 
   /** 命中返回 [[type], ringCounts, ringsPerFeature, lonlat]（普通数组）；未命中 null */
@@ -355,7 +355,7 @@ export class NativeLib {
     if (handle === 0) {
       return null;
     }
-    const res: Float64Array[] | null = ww.nativeFeatureGeometry(handle, layerIndex, fid);
+    const res: Float64Array[] | null = gc.nativeFeatureGeometry(handle, layerIndex, fid);
     if (res == null || res.length < 4) {
       return null;
     }
@@ -370,26 +370,26 @@ export class NativeLib {
 
   static nativeSetDisplayDensity(handle: number, density: number): void {
     if (handle !== 0) {
-      ww.nativeSetDisplayDensity(handle, density);
+      gc.nativeSetDisplayDensity(handle, density);
     }
   }
 
   static nativeSetLocationMarker(handle: number, lonDeg: number, latDeg: number,
     visible: boolean, headingDeg: number): void {
     if (handle !== 0) {
-      ww.nativeSetLocationMarker(handle, lonDeg, latDeg, visible, headingDeg);
+      gc.nativeSetLocationMarker(handle, lonDeg, latDeg, visible, headingDeg);
     }
   }
 
   static nativeSetLocationMarkerIcon(handle: number, iconArgb: number[], iconW: number, iconH: number): void {
     if (handle !== 0) {
-      ww.nativeSetLocationMarkerIcon(handle, toInt32Array(iconArgb), iconW, iconH);
+      gc.nativeSetLocationMarkerIcon(handle, toInt32Array(iconArgb), iconW, iconH);
     }
   }
 
   static nativeSetFontPath(handle: number, path: string): void {
     if (handle !== 0) {
-      ww.nativeSetFontPath(handle, path);
+      gc.nativeSetFontPath(handle, path);
     }
   }
 
@@ -398,7 +398,7 @@ export class NativeLib {
     if (!NativeLib.ensureLoaded()) {
       return;
     }
-    ww.nativeSetCaBundle(path);
+    gc.nativeSetCaBundle(path);
   }
 
   /**
@@ -429,16 +429,16 @@ export class NativeLib {
   // ── PROJ / GDAL 桥（bridge 导出的直通包装，门面见 NativeSrs/NativeLayerInfo/NativeVector）──
 
   static nativeGetProjVersion(): number {
-    return ww.nativeGetProjVersion();
+    return gc.nativeGetProjVersion();
   }
 
   static nativeInitProjDataPath(path: string): void {
-    ww.nativeInitProjDataPath(path);
+    gc.nativeInitProjDataPath(path);
   }
 
   /** 命中返回 [x, y]（目标坐标系）；转换不可用 null */
   static nativeConvert(x: number, y: number, srcCrs: string, tgtCrs: string): number[] | null {
-    return toIntArray(ww.nativeConvert(x, y, srcCrs, tgtCrs));
+    return toIntArray(gc.nativeConvert(x, y, srcCrs, tgtCrs));
   }
 }
 

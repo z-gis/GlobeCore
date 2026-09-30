@@ -84,7 +84,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         ohos/napi_init.cpp
         # GlobeEngine 全导出 NAPI 版（对应 jni/GlobeEngineJni.cpp，GL 生命周期改由 attach/detach 接管）
         ohos/napi_globe_engine.cpp
-        # bridge 的 NAPI 版（核心在引擎 wwbridge，此处仅编解码薄封装）
+        # bridge 的 NAPI 版（核心在引擎 gcbridge，此处仅编解码薄封装）
         ohos/napi_srs.cpp
         ohos/napi_gdal_info.cpp
         ohos/napi_layer_info.cpp
@@ -116,7 +116,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         ${GLOBECORE_ENGINE_ROOT}/render/Texture.cpp
         ${GLOBECORE_ENGINE_ROOT}/render/ImageDecoder.cpp
         ${GLOBECORE_ENGINE_ROOT}/render/FontAtlas.cpp
-        # 数据 IO 桥核心（PROJ/GDAL）：JNI 导出段在 __OHOS__ 下编译为空，仅余 wwbridge 核心
+        # 数据 IO 桥核心（PROJ/GDAL）：JNI 导出段在 __OHOS__ 下编译为空，仅余 gcbridge 核心
         ${GLOBECORE_ENGINE_ROOT}/bridge/srs.cpp
         ${GLOBECORE_ENGINE_ROOT}/bridge/gdal_info.cpp
         ${GLOBECORE_ENGINE_ROOT}/bridge/layer_info.cpp

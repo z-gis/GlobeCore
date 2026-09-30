@@ -122,7 +122,7 @@ static bool computeLayerExtent(const char *p, double extent[4]) {
     return ok;
 }
 
-namespace wwbridge {
+namespace gcbridge {
 
 bool layerExtent(const std::string &path, double extent[4]) {
     GDALAllRegister();
@@ -152,7 +152,7 @@ std::vector<std::string> vectorFieldNames(const std::string &path) {
     return names;
 }
 
-} // namespace wwbridge
+} // namespace gcbridge
 
 /**
  * 图层原始坐标系描述（矢量优先，栅格兜底）：
@@ -223,7 +223,7 @@ static char *computeLayerSrs(const char *p) {
     return buf;
 }
 
-namespace wwbridge {
+namespace gcbridge {
 
 std::string layerSrs(const std::string &path) {
     GDALAllRegister();
@@ -234,7 +234,7 @@ std::string layerSrs(const std::string &path) {
     return out;
 }
 
-} // namespace wwbridge
+} // namespace gcbridge
 
 // ── Android JNI 导出薄封装（com.zys.globecore.NativeLayerInfo 门面）──
 #if !defined(__OHOS__)
@@ -248,7 +248,7 @@ Java_com_zys_globecore_NativeLayerInfo_getLayerExtent(
     const char *p = env->GetStringUTFChars(path, nullptr);
     if (p == nullptr) return nullptr;
     double extent[4] = {0, 0, 0, 0};
-    const bool ok = wwbridge::layerExtent(p, extent);
+    const bool ok = gcbridge::layerExtent(p, extent);
     env->ReleaseStringUTFChars(path, p);
     if (!ok) {
         return nullptr;
@@ -265,7 +265,7 @@ Java_com_zys_globecore_NativeLayerInfo_getVectorFieldNames(
 
     const char *p = env->GetStringUTFChars(path, nullptr);
     if (p == nullptr) return nullptr;
-    std::vector<std::string> names = wwbridge::vectorFieldNames(p);
+    std::vector<std::string> names = gcbridge::vectorFieldNames(p);
     env->ReleaseStringUTFChars(path, p);
 
     jclass stringClass = env->FindClass("java/lang/String");
@@ -285,7 +285,7 @@ Java_com_zys_globecore_NativeLayerInfo_getLayerSrs(
 
     const char *p = env->GetStringUTFChars(path, nullptr);
     if (p == nullptr) return nullptr;
-    std::string srs = wwbridge::layerSrs(p);
+    std::string srs = gcbridge::layerSrs(p);
     env->ReleaseStringUTFChars(path, p);
     if (srs.empty()) {
         return nullptr;

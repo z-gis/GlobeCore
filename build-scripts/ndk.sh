@@ -11,8 +11,8 @@ if [ "$TARGET" = "ohos" ]; then
   # sysroot 定位：不同 OHOS NDK 版本布局不同——
   #   统一布局（5.0.3+/26.x 实测）：<native>/sysroot/usr/lib/<triple>，clang 传 --sysroot=<native>/sysroot；
   #   旧布局（早期 NEXT native）：<native>/llvm/sysroot/<triple>，clang 传 --sysroot=<该目录>。
-  # 由 ww_ohos_sysroot_dir <native> 回显 clang --sysroot 应用的根目录（两种布局自适应）。
-  ww_ohos_sysroot_dir() {
+  # 由 gc_ohos_sysroot_dir <native> 回显 clang --sysroot 应用的根目录（两种布局自适应）。
+  gc_ohos_sysroot_dir() {
     if [ -d "$1/sysroot/usr/lib/aarch64-linux-ohos" ]; then
       echo "$1/sysroot"
     elif [ -d "$1/llvm/sysroot/aarch64-linux-ohos" ]; then
@@ -28,7 +28,7 @@ if [ "$TARGET" = "ohos" ]; then
     local sr
     [ -n "$1" ] && [ -x "$1/llvm/bin/clang" ] \
       && [ -f "$1/build/cmake/ohos.toolchain.cmake" ] \
-      && sr="$(ww_ohos_sysroot_dir "$1")" \
+      && sr="$(gc_ohos_sysroot_dir "$1")" \
       && printf 'int main(){return 0;}' | "$1/llvm/bin/clang" \
            --target=aarch64-linux-ohos --sysroot="$sr" \
            -c -x c - -o /dev/null >/dev/null 2>&1
@@ -87,7 +87,7 @@ if [ "$TARGET" = "ohos" ]; then
   # llvm 根：布局与 Android TOOLCHAIN 对齐（bin/ 下的 clang/llvm-ar 等）
   export TOOLCHAIN="$OHOS_NATIVE/llvm"
   # clang --sysroot 应传入的 sysroot 根（自适应统一/旧布局），供 build-all.sh 复用
-  export WW_OHOS_SYSROOT="$(ww_ohos_sysroot_dir "$OHOS_NATIVE")"
+  export GC_OHOS_SYSROOT="$(gc_ohos_sysroot_dir "$OHOS_NATIVE")"
   echo "OHOS_NATIVE=$OHOS_NATIVE"
   [ -f "$OHOS_NATIVE/oh-uni-package.json" ] && head -n 6 "$OHOS_NATIVE/oh-uni-package.json"
 

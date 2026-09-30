@@ -1,6 +1,6 @@
 // napi_layer_info.cpp —— 图层信息 NAPI 导出（对应 Android bridge/layer_info.cpp 的 JNI 段）。
 //
-// 核心在 wwbridge（bridge_api.h）。导出命名对齐 JNI 门面 NativeLayerInfo：
+// 核心在 gcbridge（bridge_api.h）。导出命名对齐 JNI 门面 NativeLayerInfo：
 //   nativeGetLayerExtent(path) → Float64Array[4] | null（{minLon,minLat,maxLon,maxLat}）
 //   nativeGetVectorFieldNames(path) → string[]（打不开返回空数组，对齐 JNI 空 jobjectArray）
 //   nativeGetLayerSrs(path) → string | null（无 SRS/打不开 = null，核心空串转 null）
@@ -17,35 +17,35 @@ namespace {
 
 napi_value NativeGetLayerExtent(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
-    const std::string path = wwohos::NapiGetString(env, args[0]);
-    if (path.empty()) return wwohos::NapiMakeNull(env);
+    gcohos::NapiGetArgs(env, info, 1, args);
+    const std::string path = gcohos::NapiGetString(env, args[0]);
+    if (path.empty()) return gcohos::NapiMakeNull(env);
     double extent[4] = {0, 0, 0, 0};
-    if (!wwbridge::layerExtent(path, extent)) return wwohos::NapiMakeNull(env);
-    return wwohos::NapiMakeFloat64Array(env, extent, 4);
+    if (!gcbridge::layerExtent(path, extent)) return gcohos::NapiMakeNull(env);
+    return gcohos::NapiMakeFloat64Array(env, extent, 4);
 }
 
 napi_value NativeGetVectorFieldNames(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
-    const std::string path = wwohos::NapiGetString(env, args[0]);
-    if (path.empty()) return wwohos::NapiMakeStringArray(env, {});
-    return wwohos::NapiMakeStringArray(env, wwbridge::vectorFieldNames(path));
+    gcohos::NapiGetArgs(env, info, 1, args);
+    const std::string path = gcohos::NapiGetString(env, args[0]);
+    if (path.empty()) return gcohos::NapiMakeStringArray(env, {});
+    return gcohos::NapiMakeStringArray(env, gcbridge::vectorFieldNames(path));
 }
 
 napi_value NativeGetLayerSrs(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
-    const std::string path = wwohos::NapiGetString(env, args[0]);
-    if (path.empty()) return wwohos::NapiMakeNull(env);
-    const std::string srs = wwbridge::layerSrs(path);
-    if (srs.empty()) return wwohos::NapiMakeNull(env); // 对齐 JNI 空串 → null
-    return wwohos::NapiMakeString(env, srs);
+    gcohos::NapiGetArgs(env, info, 1, args);
+    const std::string path = gcohos::NapiGetString(env, args[0]);
+    if (path.empty()) return gcohos::NapiMakeNull(env);
+    const std::string srs = gcbridge::layerSrs(path);
+    if (srs.empty()) return gcohos::NapiMakeNull(env); // 对齐 JNI 空串 → null
+    return gcohos::NapiMakeString(env, srs);
 }
 
 } // namespace
 
-namespace wwohos {
+namespace gcohos {
 
 napi_value RegisterLayerInfo(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
@@ -57,4 +57,4 @@ napi_value RegisterLayerInfo(napi_env env, napi_value exports) {
     return exports;
 }
 
-} // namespace wwohos
+} // namespace gcohos

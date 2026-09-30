@@ -7,7 +7,7 @@
   "license": "Apache-2.0",
   "dependencies": {
     // 自有 native 模块类型声明（so 名 libglobecore.so，nm_modname=globecore）；
-    // ArkTS 门面经 import ww from 'libglobecore.so' 引用
+    // ArkTS 门面经 import gc from 'libglobecore.so' 引用
     //"libglobecore.so": "file:./src/main/cpp/types/libglobecore"
   }
 }

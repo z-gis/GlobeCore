@@ -4,13 +4,13 @@ export MINIZIP_VER=1.2.13
 : "${ABI:=x86_64}"
 : "${API:=24}"
 : "${TARGET:=android}"
-: "${WW_PFX:=}"
+: "${GC_PFX:=}"
 : "${MAIN_DIR:=/mnt/k/dev/MobileMap/GdalDemo/gdal-build}"
 : "${NDK_ROOT:=$MAIN_DIR/android-ndk-r23b}"
 : "${TOOLCHAIN:=$NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64}"
-: "${PREFIX:=$MAIN_DIR/export/third_party$WW_PFX-$ABI}"
+: "${PREFIX:=$MAIN_DIR/export/third_party$GC_PFX-$ABI}"
 # 单独直跑时（不经 build-all.sh）默认按 Android 工具链参数；经 build-all 时已被注入覆盖
-: "${WW_CMAKE_TARGET_ARGS:=-DCMAKE_TOOLCHAIN_FILE=$NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI=$ABI -DANDROID_PLATFORM=android-$API}"
+: "${GC_CMAKE_TARGET_ARGS:=-DCMAKE_TOOLCHAIN_FILE=$NDK_ROOT/build/cmake/android.toolchain.cmake -DANDROID_ABI=$ABI -DANDROID_PLATFORM=android-$API}"
 
 case "$ABI" in
   x86_64)
@@ -54,7 +54,7 @@ rm -rf "build-$TARGET-$ABI"
 mkdir "build-$TARGET-$ABI" && cd "build-$TARGET-$ABI"
 # 目标工具链参数由 build-all.sh 按 TARGET 注入（android: NDK toolchain；ohos: ohos.toolchain）
 cmake .. \
-  $WW_CMAKE_TARGET_ARGS \
+  $GC_CMAKE_TARGET_ARGS \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \

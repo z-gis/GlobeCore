@@ -1,6 +1,6 @@
 // napi_gdal_info.cpp —— GDAL 版本与驱动清单 NAPI 导出（对应 Android bridge/gdal_info.cpp 的 JNI 段）。
 //
-// 核心在 wwbridge::gdalVersion / vectorDrivers；JNI 版挂在 NativeLayerInfo 门面，
+// 核心在 gcbridge::gdalVersion / vectorDrivers；JNI 版挂在 NativeLayerInfo 门面，
 // 鸿蒙统一导出：
 //   nativeGetGdalVersion() → string
 //   nativeGetVectorDrivers() → string（逐行 "NAME（读/写|只读）"）
@@ -14,16 +14,16 @@
 namespace {
 
 napi_value NativeGetGdalVersion(napi_env env, napi_callback_info /*info*/) {
-    return wwohos::NapiMakeString(env, wwbridge::gdalVersion());
+    return gcohos::NapiMakeString(env, gcbridge::gdalVersion());
 }
 
 napi_value NativeGetVectorDrivers(napi_env env, napi_callback_info /*info*/) {
-    return wwohos::NapiMakeString(env, wwbridge::vectorDrivers());
+    return gcohos::NapiMakeString(env, gcbridge::vectorDrivers());
 }
 
 } // namespace
 
-namespace wwohos {
+namespace gcohos {
 
 napi_value RegisterGdalInfo(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
@@ -34,4 +34,4 @@ napi_value RegisterGdalInfo(napi_env env, napi_value exports) {
     return exports;
 }
 
-} // namespace wwohos
+} // namespace gcohos

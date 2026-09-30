@@ -52,7 +52,7 @@ static PJ *getCachedPipelineLocked(const std::string &src, const std::string &tg
     return pj;
 }
 
-namespace wwbridge {
+namespace gcbridge {
 
 int projVersion() {
     const PJ_INFO info = proj_info();
@@ -89,7 +89,7 @@ bool convert(double x, double y, const std::string &srcCrs, const std::string &t
     return true;
 }
 
-} // namespace wwbridge
+} // namespace gcbridge
 
 // ── Android JNI 导出薄封装（com.zys.globecore.NativeSrs 门面）──
 #if !defined(__OHOS__)
@@ -98,7 +98,7 @@ bool convert(double x, double y, const std::string &srcCrs, const std::string &t
 extern "C"
 JNIEXPORT jint JNICALL
 Java_com_zys_globecore_NativeSrs_getProjVersion(JNIEnv * /*env*/, jobject /*thiz*/) {
-    return static_cast<jint>(wwbridge::projVersion());
+    return static_cast<jint>(gcbridge::projVersion());
 }
 
 extern "C"
@@ -107,7 +107,7 @@ Java_com_zys_globecore_NativeSrs_initProjDataPath(JNIEnv *env, jobject /*thiz*/,
                                                      jstring proj_data_path) {
     const char *path = env->GetStringUTFChars(proj_data_path, nullptr);
     if (path == nullptr) return;
-    wwbridge::initProjDataPath(path);
+    gcbridge::initProjDataPath(path);
     env->ReleaseStringUTFChars(proj_data_path, path);
 }
 
@@ -127,7 +127,7 @@ Java_com_zys_globecore_NativeSrs_convert(
     }
     double outX = 0.0;
     double outY = 0.0;
-    const bool ok = wwbridge::convert(x, y, src, tgt, outX, outY);
+    const bool ok = gcbridge::convert(x, y, src, tgt, outX, outY);
     env->ReleaseStringUTFChars(src_crs, src);
     env->ReleaseStringUTFChars(tgt_crs, tgt);
     if (!ok) return nullptr;

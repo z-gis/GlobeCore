@@ -11,34 +11,34 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#define WWJNI_LOG_TAG "globecore"
+#define GC_LOG_TAG "globecore"
 // hilog 应用域（0x0000-0xFFFF 用户域内自取一值，便于 hdc hilog -T 过滤）
-#define WWJNI_LOG_DOMAIN 0x8811
+#define GC_LOG_DOMAIN 0x8811
 
 __attribute__((format(printf, 2, 3)))
-static inline void wwjni_log(unsigned int level, const char *fmt, ...) {
+static inline void gc_log(unsigned int level, const char *fmt, ...) {
     char buf[1024];
     va_list ap;
     va_start(ap, fmt);
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
-    OH_LOG_Print(LOG_APP, (LogLevel)level, WWJNI_LOG_DOMAIN, WWJNI_LOG_TAG, "%{public}s", buf);
+    OH_LOG_Print(LOG_APP, (LogLevel)level, GC_LOG_DOMAIN, GC_LOG_TAG, "%{public}s", buf);
 }
 
-#define LOGD(...) wwjni_log(LOG_DEBUG, __VA_ARGS__)
-#define LOGI(...) wwjni_log(LOG_INFO, __VA_ARGS__)
-#define LOGW(...) wwjni_log(LOG_WARN, __VA_ARGS__)
-#define LOGE(...) wwjni_log(LOG_ERROR, __VA_ARGS__)
+#define LOGD(...) gc_log(LOG_DEBUG, __VA_ARGS__)
+#define LOGI(...) gc_log(LOG_INFO, __VA_ARGS__)
+#define LOGW(...) gc_log(LOG_WARN, __VA_ARGS__)
+#define LOGE(...) gc_log(LOG_ERROR, __VA_ARGS__)
 
 #else // Android
 
 #include <android/log.h>
 
-#define WWJNI_LOG_TAG "globecore"
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, WWJNI_LOG_TAG, __VA_ARGS__)
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, WWJNI_LOG_TAG, __VA_ARGS__)
-#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, WWJNI_LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, WWJNI_LOG_TAG, __VA_ARGS__)
+#define GC_LOG_TAG "globecore"
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, GC_LOG_TAG, __VA_ARGS__)
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, GC_LOG_TAG, __VA_ARGS__)
+#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, GC_LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, GC_LOG_TAG, __VA_ARGS__)
 
 #endif // __OHOS__
 

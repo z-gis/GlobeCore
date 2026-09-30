@@ -29,7 +29,7 @@
 
 namespace globecore { class GlobeEngine; }
 
-namespace wwohos {
+namespace gcohos {
 
 /// 从 napi 模块 exports 的 OH_NATIVE_XCOMPONENT_OBJ 属性取 OH_NativeXComponent*
 /// （实现见 napi_init.cpp；官方取法，onLoad 传入的 context 对象在 API 12+ 已不承载组件指针）。
@@ -114,6 +114,6 @@ private:
     std::unique_ptr<MapRenderHost> host_; // surface 创建后非空，销毁/detach 时置空
 };
 
-} // namespace wwohos
+} // namespace gcohos
 
 #endif // GLOBECORE_OHOS_XCOMPONENTBRIDGE_H

@@ -30,7 +30,7 @@ rm -rf build-$TARGET-$ABI
 mkdir build-$TARGET-$ABI && cd build-$TARGET-$ABI
 # 目标工具链参数由 build-all.sh 按 TARGET 注入（android: NDK toolchain；ohos: ohos.toolchain）
 cmake .. \
-  $WW_CMAKE_TARGET_ARGS \
+  $GC_CMAKE_TARGET_ARGS \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_SHARED_LIBS=OFF \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \

@@ -7,7 +7,7 @@
 # 产出一个自含 OpenSSL 的 libcurl.a（与历史 jniLibs 里的 libcurl.a 同构：链接时只需 -lcurl，zlib 由 zstatic 提供）。
 #
 # 依赖环境变量：ABI PREFIX NDK_ROOT TOOLCHAIN API CC MAIN_DIR BASE_PATH PKG_CACHE TARGET
-#               WW_CMAKE_TARGET_ARGS（build-all.sh 按 TARGET 注入：android/ohos 工具链参数）
+#               GC_CMAKE_TARGET_ARGS（build-all.sh 按 TARGET 注入：android/ohos 工具链参数）
 
 CURL_VER=${CURL_VER:-8.4.0}
 CURL_DOTTED="$CURL_VER"                              # 8.4.0
@@ -47,7 +47,7 @@ if [ ! -d "$SRC_DIR" ]; then
   [ "$top" != "$SRC_DIR" ] && mv "$top" "$SRC_DIR"
 fi
 # 目标工具链参数由 build-all.sh 按 TARGET 注入（ohos 时 NDK_ROOT 不存在，不得引用）
-[ -n "${WW_CMAKE_TARGET_ARGS:-}" ] || { echo "[curl] WW_CMAKE_TARGET_ARGS 未注入，请经 build-all.sh 调用"; exit 1; }
+[ -n "${GC_CMAKE_TARGET_ARGS:-}" ] || { echo "[curl] GC_CMAKE_TARGET_ARGS 未注入，请经 build-all.sh 调用"; exit 1; }
 
 # —— 源码绝对路径（供后续头文件复制与 cmake 源目录引用）——
 SRC_ABS="$MAIN_DIR/$SRC_DIR"
@@ -60,7 +60,7 @@ cd "$BUILD_DIR"
 
 CMDCMAKE="${CMAKE:-cmake}"
 "$CMDCMAKE" "$SRC_ABS" \
-  $WW_CMAKE_TARGET_ARGS \
+  $GC_CMAKE_TARGET_ARGS \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
   -DBUILD_SHARED_LIBS=OFF \

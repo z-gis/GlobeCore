@@ -40,7 +40,7 @@ inline GlobeEngine *toGlobeEngine(int64_t handle) {
 /// handle → XComponentBridge 注册表（attach 建立、detach/destroy 拆除）；
 /// 引擎重绘回调经 MapRenderHost 在 attach 内部接线，此表仅服务 requestRender/detach 反查。
 std::mutex g_bridgesMtx;
-std::unordered_map<int64_t, wwohos::XComponentBridge *> g_bridges;
+std::unordered_map<int64_t, gcohos::XComponentBridge *> g_bridges;
 
 // ── 单击拾取：渲染线程→JS 主线程的 TSFN 投递（native 手势确认后回调 ArkTS）──
 // SURFACE 型 XComponent 触摸只进 native（ArkTS .onTouch 不触发），故单击事件源在渲染线程，
@@ -136,14 +136,14 @@ inline std::vector<int> toIntVec(const std::vector<double> &v) {
 // ── 生命周期 ──
 
 napi_value NativeCreate(napi_env env, napi_callback_info /*info*/) {
-    return wwohos::NapiMakeInt64(env, reinterpret_cast<int64_t>(new GlobeEngine()));
+    return gcohos::NapiMakeInt64(env, reinterpret_cast<int64_t>(new GlobeEngine()));
 }
 
 napi_value NativeDestroy(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
+    gcohos::NapiGetArgs(env, info, 1, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     // 安全网：未 detach 的桥先拆除（停渲染线程再删 GlobeEngine，防 EGL 线程悬挂）
     {
         std::lock_guard<std::mutex> lock(g_bridgesMtx);
@@ -162,20 +162,20 @@ napi_value NativeDestroy(napi_env env, napi_callback_info info) {
 /// nativeAttach(handle, surfaceId, width, height) → bool：用 surfaceId 直接绑定 surface 并起 EGL 渲染线程
 napi_value NativeAttach(napi_env env, napi_callback_info info) {
     napi_value args[4];
-    wwohos::NapiGetArgs(env, info, 4, args);
+    gcohos::NapiGetArgs(env, info, 4, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) {
-        return wwohos::NapiMakeBool(env, false);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) {
+        return gcohos::NapiMakeBool(env, false);
     }
     int64_t surfaceId = 0;
-    wwohos::NapiGetInt64(env, args[1], surfaceId);
+    gcohos::NapiGetInt64(env, args[1], surfaceId);
     int32_t width = 0;
     int32_t height = 0;
-    wwohos::NapiGetInt32(env, args[2], width);
-    wwohos::NapiGetInt32(env, args[3], height);
-    auto *bridge = wwohos::XComponentBridge::attach(env, toGlobeEngine(handle),
+    gcohos::NapiGetInt32(env, args[2], width);
+    gcohos::NapiGetInt32(env, args[3], height);
+    auto *bridge = gcohos::XComponentBridge::attach(env, toGlobeEngine(handle),
                                                     static_cast<uint64_t>(surfaceId), width, height);
-    if (bridge == nullptr) return wwohos::NapiMakeBool(env, false);
+    if (bridge == nullptr) return gcohos::NapiMakeBool(env, false);
     std::lock_guard<std::mutex> lock(g_bridgesMtx);
     auto it = g_bridges.find(handle);
     if (it != g_bridges.end()) { // 重挂：旧桥拆除（ ArkTS 侧应先 detach，此为防御路径）
@@ -185,16 +185,16 @@ napi_value NativeAttach(napi_env env, napi_callback_info info) {
     g_bridges[handle] = bridge;
     // attach 前已注册的单击回调补装进桥（桥内部再转 host）
     bridge->setSingleTapCallback(MakeTapDispatcher(handle));
-    return wwohos::NapiMakeBool(env, true);
+    return gcohos::NapiMakeBool(env, true);
 }
 
 /// nativeDetach(handle)：注销 surface 回调 + 停渲染线程（GlobeEngine 数据态保留，可再 attach）
 napi_value NativeDetach(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
+    gcohos::NapiGetArgs(env, info, 1, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
-    wwohos::XComponentBridge *bridge = nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    gcohos::XComponentBridge *bridge = nullptr;
     {
         std::lock_guard<std::mutex> lock(g_bridgesMtx);
         auto it = g_bridges.find(handle);
@@ -215,9 +215,9 @@ napi_value NativeDetach(napi_env env, napi_callback_info info) {
 /// 事件源：native 手势识别确认的单击（短按未移动且未触发长按），坐标 vp。
 napi_value NativeSetTapCallback(napi_env env, napi_callback_info info) {
     napi_value args[2];
-    wwohos::NapiGetArgs(env, info, 2, args);
+    gcohos::NapiGetArgs(env, info, 2, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
 
     ReleaseTapListener(handle); // 替换语义：先拆旧投递器
 
@@ -255,9 +255,9 @@ napi_value NativeSetTapCallback(napi_env env, napi_callback_info info) {
 /// 手势/属性变更后显式刷帧（对应 Kotlin view.requestRender()；surface 未就绪时忽略）
 napi_value NativeRequestRender(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
+    gcohos::NapiGetArgs(env, info, 1, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     std::lock_guard<std::mutex> lock(g_bridgesMtx);
     auto it = g_bridges.find(handle);
     if (it != g_bridges.end()) it->second->requestRender();
@@ -268,19 +268,19 @@ napi_value NativeRequestRender(napi_env env, napi_callback_info info) {
 
 napi_value NativeSetCamera(napi_env env, napi_callback_info info) {
     napi_value args[9];
-    wwohos::NapiGetArgs(env, info, 9, args);
+    gcohos::NapiGetArgs(env, info, 9, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     double lat = 0, lon = 0, alt = 0, heading = 0, tilt = 0, roll = 0, fov = 0;
     int32_t altMode = 0;
-    wwohos::NapiGetDouble(env, args[1], lat);
-    wwohos::NapiGetDouble(env, args[2], lon);
-    wwohos::NapiGetDouble(env, args[3], alt);
-    wwohos::NapiGetDouble(env, args[4], heading);
-    wwohos::NapiGetDouble(env, args[5], tilt);
-    wwohos::NapiGetDouble(env, args[6], roll);
-    wwohos::NapiGetDouble(env, args[7], fov);
-    wwohos::NapiGetInt32(env, args[8], altMode);
+    gcohos::NapiGetDouble(env, args[1], lat);
+    gcohos::NapiGetDouble(env, args[2], lon);
+    gcohos::NapiGetDouble(env, args[3], alt);
+    gcohos::NapiGetDouble(env, args[4], heading);
+    gcohos::NapiGetDouble(env, args[5], tilt);
+    gcohos::NapiGetDouble(env, args[6], roll);
+    gcohos::NapiGetDouble(env, args[7], fov);
+    gcohos::NapiGetInt32(env, args[8], altMode);
     globecore::Camera cam;
     cam.latitude = lat;
     cam.longitude = lon;
@@ -299,80 +299,80 @@ napi_value NativeSetCamera(napi_env env, napi_callback_info info) {
 
 napi_value NativeGetCamera(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
+    gcohos::NapiGetArgs(env, info, 1, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeNull(env);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeNull(env);
     const globecore::Camera cam = toGlobeEngine(handle)->getCamera();
     const double buf[8] = {
         cam.latitude, cam.longitude, cam.altitude,
         cam.heading, cam.tilt, cam.roll, cam.fieldOfView,
         static_cast<double>(static_cast<int>(cam.altitudeMode)),
     };
-    return wwohos::NapiMakeFloat64Array(env, buf, 8);
+    return gcohos::NapiMakeFloat64Array(env, buf, 8);
 }
 
 napi_value NativeSetViewMode(napi_env env, napi_callback_info info) {
     napi_value args[2];
-    wwohos::NapiGetArgs(env, info, 2, args);
+    gcohos::NapiGetArgs(env, info, 2, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t mode = 0;
-    wwohos::NapiGetInt32(env, args[1], mode);
+    gcohos::NapiGetInt32(env, args[1], mode);
     toGlobeEngine(handle)->setViewMode(mode);
     return nullptr;
 }
 
 napi_value NativeGetViewMode(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
+    gcohos::NapiGetArgs(env, info, 1, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeInt32(env, 0);
-    return wwohos::NapiMakeInt32(env, toGlobeEngine(handle)->viewMode());
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeInt32(env, 0);
+    return gcohos::NapiMakeInt32(env, toGlobeEngine(handle)->viewMode());
 }
 
 napi_value NativePanBy(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     double dx = 0, dy = 0;
-    wwohos::NapiGetDouble(env, args[1], dx);
-    wwohos::NapiGetDouble(env, args[2], dy);
+    gcohos::NapiGetDouble(env, args[1], dx);
+    gcohos::NapiGetDouble(env, args[2], dy);
     toGlobeEngine(handle)->panByPixels(dx, dy);
     return nullptr;
 }
 
 napi_value NativeZoomBy(napi_env env, napi_callback_info info) {
     napi_value args[4];
-    wwohos::NapiGetArgs(env, info, 4, args);
+    gcohos::NapiGetArgs(env, info, 4, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     double factor = 1, fx = 0, fy = 0;
-    wwohos::NapiGetDouble(env, args[1], factor);
-    wwohos::NapiGetDouble(env, args[2], fx);
-    wwohos::NapiGetDouble(env, args[3], fy);
+    gcohos::NapiGetDouble(env, args[1], factor);
+    gcohos::NapiGetDouble(env, args[2], fx);
+    gcohos::NapiGetDouble(env, args[3], fy);
     toGlobeEngine(handle)->zoomBy(factor, fx, fy);
     return nullptr;
 }
 
 napi_value NativeRotateHeading(napi_env env, napi_callback_info info) {
     napi_value args[2];
-    wwohos::NapiGetArgs(env, info, 2, args);
+    gcohos::NapiGetArgs(env, info, 2, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     double delta = 0;
-    wwohos::NapiGetDouble(env, args[1], delta);
+    gcohos::NapiGetDouble(env, args[1], delta);
     toGlobeEngine(handle)->rotateHeading(delta);
     return nullptr;
 }
 
 napi_value NativeRotateTilt(napi_env env, napi_callback_info info) {
     napi_value args[2];
-    wwohos::NapiGetArgs(env, info, 2, args);
+    gcohos::NapiGetArgs(env, info, 2, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     double delta = 0;
-    wwohos::NapiGetDouble(env, args[1], delta);
+    gcohos::NapiGetDouble(env, args[1], delta);
     toGlobeEngine(handle)->rotateTilt(delta);
     return nullptr;
 }
@@ -381,84 +381,84 @@ napi_value NativeRotateTilt(napi_env env, napi_callback_info info) {
 
 napi_value NativeAddTileLayer(napi_env env, napi_callback_info info) {
     napi_value args[5];
-    wwohos::NapiGetArgs(env, info, 5, args);
+    gcohos::NapiGetArgs(env, info, 5, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
-    const std::string cacheDir = wwohos::NapiGetString(env, args[1]);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    const std::string cacheDir = gcohos::NapiGetString(env, args[1]);
     if (cacheDir.empty()) return nullptr;
-    const std::string url = wwohos::NapiGetString(env, args[2]);
+    const std::string url = gcohos::NapiGetString(env, args[2]);
     int32_t maxLevel = 0;
-    wwohos::NapiGetInt32(env, args[3], maxLevel);
+    gcohos::NapiGetInt32(env, args[3], maxLevel);
     bool overlay = false;
-    wwohos::NapiGetBool(env, args[4], overlay);
+    gcohos::NapiGetBool(env, args[4], overlay);
     toGlobeEngine(handle)->addTileLayer(cacheDir, url, maxLevel, overlay);
     return nullptr;
 }
 
 napi_value NativeSetLayerVisible(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1;
     bool visible = false;
-    wwohos::NapiGetInt32(env, args[1], index);
-    wwohos::NapiGetBool(env, args[2], visible);
+    gcohos::NapiGetInt32(env, args[1], index);
+    gcohos::NapiGetBool(env, args[2], visible);
     toGlobeEngine(handle)->setLayerVisible(index, visible);
     return nullptr;
 }
 
 napi_value NativeAddRasterLayer(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeInt32(env, -1);
-    const std::string cacheDir = wwohos::NapiGetString(env, args[1]);
-    const std::string path = wwohos::NapiGetString(env, args[2]);
-    if (cacheDir.empty() || path.empty()) return wwohos::NapiMakeInt32(env, -1);
-    return wwohos::NapiMakeInt32(env, toGlobeEngine(handle)->addRasterLayer(cacheDir, path));
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeInt32(env, -1);
+    const std::string cacheDir = gcohos::NapiGetString(env, args[1]);
+    const std::string path = gcohos::NapiGetString(env, args[2]);
+    if (cacheDir.empty() || path.empty()) return gcohos::NapiMakeInt32(env, -1);
+    return gcohos::NapiMakeInt32(env, toGlobeEngine(handle)->addRasterLayer(cacheDir, path));
 }
 
 // ── 矢量图层 ──
 
 napi_value NativeAddVectorLayer(napi_env env, napi_callback_info info) {
     napi_value args[23];
-    wwohos::NapiGetArgs(env, info, 23, args);
+    gcohos::NapiGetArgs(env, info, 23, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeInt32(env, -1);
-    const std::string path = wwohos::NapiGetString(env, args[1]);
-    if (path.empty()) return wwohos::NapiMakeInt32(env, -1);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeInt32(env, -1);
+    const std::string path = gcohos::NapiGetString(env, args[1]);
+    if (path.empty()) return gcohos::NapiMakeInt32(env, -1);
 
     int32_t fillColor = 0, outlineColor = 0, lineColor = 0, pointColor = 0;
     int32_t labelColor = 0, labelOutlineColor = 0;
     double outlineWidth = 0, lineWidth = 0, pointRadiusDp = 0, labelSize = 0;
     bool labelOutline = false;
-    wwohos::NapiGetInt32(env, args[2], fillColor);
-    wwohos::NapiGetInt32(env, args[3], outlineColor);
-    wwohos::NapiGetDouble(env, args[4], outlineWidth);
-    wwohos::NapiGetInt32(env, args[5], lineColor);
-    wwohos::NapiGetDouble(env, args[6], lineWidth);
-    wwohos::NapiGetInt32(env, args[7], pointColor);
-    wwohos::NapiGetDouble(env, args[8], pointRadiusDp);
-    const std::string labelField = wwohos::NapiGetString(env, args[9]);
-    wwohos::NapiGetInt32(env, args[10], labelColor);
-    wwohos::NapiGetDouble(env, args[11], labelSize);
-    wwohos::NapiGetBool(env, args[12], labelOutline);
-    wwohos::NapiGetInt32(env, args[13], labelOutlineColor);
-    const std::vector<int32_t> iconArgb = wwohos::NapiGetInt32Array(env, args[14]);
+    gcohos::NapiGetInt32(env, args[2], fillColor);
+    gcohos::NapiGetInt32(env, args[3], outlineColor);
+    gcohos::NapiGetDouble(env, args[4], outlineWidth);
+    gcohos::NapiGetInt32(env, args[5], lineColor);
+    gcohos::NapiGetDouble(env, args[6], lineWidth);
+    gcohos::NapiGetInt32(env, args[7], pointColor);
+    gcohos::NapiGetDouble(env, args[8], pointRadiusDp);
+    const std::string labelField = gcohos::NapiGetString(env, args[9]);
+    gcohos::NapiGetInt32(env, args[10], labelColor);
+    gcohos::NapiGetDouble(env, args[11], labelSize);
+    gcohos::NapiGetBool(env, args[12], labelOutline);
+    gcohos::NapiGetInt32(env, args[13], labelOutlineColor);
+    const std::vector<int32_t> iconArgb = gcohos::NapiGetInt32Array(env, args[14]);
     int32_t iconW = 0, iconH = 0;
-    wwohos::NapiGetInt32(env, args[15], iconW);
-    wwohos::NapiGetInt32(env, args[16], iconH);
+    gcohos::NapiGetInt32(env, args[15], iconW);
+    gcohos::NapiGetInt32(env, args[16], iconH);
     bool hasExtent = false;
-    wwohos::NapiGetBool(env, args[17], hasExtent);
+    gcohos::NapiGetBool(env, args[17], hasExtent);
     double minLon = 0, minLat = 0, maxLon = 0, maxLat = 0;
-    wwohos::NapiGetDouble(env, args[18], minLon);
-    wwohos::NapiGetDouble(env, args[19], minLat);
-    wwohos::NapiGetDouble(env, args[20], maxLon);
-    wwohos::NapiGetDouble(env, args[21], maxLat);
+    gcohos::NapiGetDouble(env, args[18], minLon);
+    gcohos::NapiGetDouble(env, args[19], minLat);
+    gcohos::NapiGetDouble(env, args[20], maxLon);
+    gcohos::NapiGetDouble(env, args[21], maxLat);
     // maxFeatures 为第 23 个参数（NativeLib.kt 末位，缺省 0 = 引擎默认上限）
     int32_t maxFeatures = 0;
-    if (args[22] != nullptr) wwohos::NapiGetInt32(env, args[22], maxFeatures);
+    if (args[22] != nullptr) gcohos::NapiGetInt32(env, args[22], maxFeatures);
 
     globecore::VectorStyle style;
     unpackArgb(fillColor, style.fillR, style.fillG, style.fillB, style.fillA);
@@ -479,24 +479,24 @@ napi_value NativeAddVectorLayer(napi_env env, napi_callback_info info) {
     const int index = toGlobeEngine(handle)->addVectorLayer(
             path, style, std::move(iconRgba), iconW, iconH,
             hasExtent, minLon, minLat, maxLon, maxLat, maxFeatures);
-    return wwohos::NapiMakeInt32(env, index);
+    return gcohos::NapiMakeInt32(env, index);
 }
 
 napi_value NativeUpdateVectorExtent(napi_env env, napi_callback_info info) {
     napi_value args[8];
-    wwohos::NapiGetArgs(env, info, 8, args);
+    gcohos::NapiGetArgs(env, info, 8, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1, maxFeatures = 0;
     bool hasExtent = false;
-    wwohos::NapiGetInt32(env, args[1], index);
-    wwohos::NapiGetBool(env, args[2], hasExtent);
+    gcohos::NapiGetInt32(env, args[1], index);
+    gcohos::NapiGetBool(env, args[2], hasExtent);
     double minLon = 0, minLat = 0, maxLon = 0, maxLat = 0;
-    wwohos::NapiGetDouble(env, args[3], minLon);
-    wwohos::NapiGetDouble(env, args[4], minLat);
-    wwohos::NapiGetDouble(env, args[5], maxLon);
-    wwohos::NapiGetDouble(env, args[6], maxLat);
-    wwohos::NapiGetInt32(env, args[7], maxFeatures);
+    gcohos::NapiGetDouble(env, args[3], minLon);
+    gcohos::NapiGetDouble(env, args[4], minLat);
+    gcohos::NapiGetDouble(env, args[5], maxLon);
+    gcohos::NapiGetDouble(env, args[6], maxLat);
+    gcohos::NapiGetInt32(env, args[7], maxFeatures);
     toGlobeEngine(handle)->updateVectorExtent(index, hasExtent, minLon, minLat, maxLon, maxLat,
                                               maxFeatures);
     return nullptr;
@@ -504,52 +504,52 @@ napi_value NativeUpdateVectorExtent(napi_env env, napi_callback_info info) {
 
 napi_value NativeHasVectorLoading(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
+    gcohos::NapiGetArgs(env, info, 1, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeBool(env, false);
-    return wwohos::NapiMakeBool(env, toGlobeEngine(handle)->hasVectorLoading());
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeBool(env, false);
+    return gcohos::NapiMakeBool(env, toGlobeEngine(handle)->hasVectorLoading());
 }
 
 napi_value NativeSetVectorLayerVisible(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1;
     bool visible = false;
-    wwohos::NapiGetInt32(env, args[1], index);
-    wwohos::NapiGetBool(env, args[2], visible);
+    gcohos::NapiGetInt32(env, args[1], index);
+    gcohos::NapiGetBool(env, args[2], visible);
     toGlobeEngine(handle)->setVectorLayerVisible(index, visible);
     return nullptr;
 }
 
 napi_value NativeSetVectorMinLevel(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1, minLevel = 0;
-    wwohos::NapiGetInt32(env, args[1], index);
-    wwohos::NapiGetInt32(env, args[2], minLevel);
+    gcohos::NapiGetInt32(env, args[1], index);
+    gcohos::NapiGetInt32(env, args[2], minLevel);
     toGlobeEngine(handle)->setVectorMinLevel(index, minLevel);
     return nullptr;
 }
 
 napi_value NativeGetCameraZoomLevel(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
+    gcohos::NapiGetArgs(env, info, 1, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeInt32(env, 0);
-    return wwohos::NapiMakeInt32(env, toGlobeEngine(handle)->currentZoomLevel());
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeInt32(env, 0);
+    return gcohos::NapiMakeInt32(env, toGlobeEngine(handle)->currentZoomLevel());
 }
 
 napi_value NativeRemoveVectorLayer(napi_env env, napi_callback_info info) {
     napi_value args[2];
-    wwohos::NapiGetArgs(env, info, 2, args);
+    gcohos::NapiGetArgs(env, info, 2, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1;
-    wwohos::NapiGetInt32(env, args[1], index);
+    gcohos::NapiGetInt32(env, args[1], index);
     toGlobeEngine(handle)->removeVectorLayer(index);
     return nullptr;
 }
@@ -558,28 +558,28 @@ napi_value NativeRemoveVectorLayer(napi_env env, napi_callback_info info) {
 
 napi_value NativeAddOverlayLayer(napi_env env, napi_callback_info info) {
     napi_value args[15];
-    wwohos::NapiGetArgs(env, info, 15, args);
+    gcohos::NapiGetArgs(env, info, 15, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeInt32(env, -1);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeInt32(env, -1);
     int32_t fillColor = 0, outlineColor = 0, lineColor = 0, pointColor = 0;
     int32_t labelColor = 0, labelOutlineColor = 0;
     double outlineWidth = 0, lineWidth = 0, pointRadiusDp = 0, labelSize = 0;
     bool labelOutline = false;
-    wwohos::NapiGetInt32(env, args[1], fillColor);
-    wwohos::NapiGetInt32(env, args[2], outlineColor);
-    wwohos::NapiGetDouble(env, args[3], outlineWidth);
-    wwohos::NapiGetInt32(env, args[4], lineColor);
-    wwohos::NapiGetDouble(env, args[5], lineWidth);
-    wwohos::NapiGetInt32(env, args[6], pointColor);
-    wwohos::NapiGetDouble(env, args[7], pointRadiusDp);
-    wwohos::NapiGetInt32(env, args[8], labelColor);
-    wwohos::NapiGetDouble(env, args[9], labelSize);
-    wwohos::NapiGetBool(env, args[10], labelOutline);
-    wwohos::NapiGetInt32(env, args[11], labelOutlineColor);
-    const std::vector<int32_t> iconArgb = wwohos::NapiGetInt32Array(env, args[12]);
+    gcohos::NapiGetInt32(env, args[1], fillColor);
+    gcohos::NapiGetInt32(env, args[2], outlineColor);
+    gcohos::NapiGetDouble(env, args[3], outlineWidth);
+    gcohos::NapiGetInt32(env, args[4], lineColor);
+    gcohos::NapiGetDouble(env, args[5], lineWidth);
+    gcohos::NapiGetInt32(env, args[6], pointColor);
+    gcohos::NapiGetDouble(env, args[7], pointRadiusDp);
+    gcohos::NapiGetInt32(env, args[8], labelColor);
+    gcohos::NapiGetDouble(env, args[9], labelSize);
+    gcohos::NapiGetBool(env, args[10], labelOutline);
+    gcohos::NapiGetInt32(env, args[11], labelOutlineColor);
+    const std::vector<int32_t> iconArgb = gcohos::NapiGetInt32Array(env, args[12]);
     int32_t iconW = 0, iconH = 0;
-    wwohos::NapiGetInt32(env, args[13], iconW);
-    wwohos::NapiGetInt32(env, args[14], iconH);
+    gcohos::NapiGetInt32(env, args[13], iconW);
+    gcohos::NapiGetInt32(env, args[14], iconH);
 
     globecore::VectorStyle style;
     unpackArgb(fillColor, style.fillR, style.fillG, style.fillB, style.fillA);
@@ -595,35 +595,35 @@ napi_value NativeAddOverlayLayer(napi_env env, napi_callback_info info) {
     unpackArgb(labelOutlineColor, style.labelOutlineR, style.labelOutlineG, style.labelOutlineB,
                style.labelOutlineA);
     std::vector<uint8_t> iconRgba = iconArgbToRgba(iconArgb, iconW, iconH);
-    return wwohos::NapiMakeInt32(env,
+    return gcohos::NapiMakeInt32(env,
                                  toGlobeEngine(handle)->addOverlayLayer(style, std::move(iconRgba), iconW, iconH));
 }
 
 napi_value NativeUpdateOverlayPoints(napi_env env, napi_callback_info info) {
     napi_value args[5];
-    wwohos::NapiGetArgs(env, info, 5, args);
+    gcohos::NapiGetArgs(env, info, 5, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1;
-    wwohos::NapiGetInt32(env, args[1], index);
-    const std::vector<double> lonlat = wwohos::NapiGetFloat64Array(env, args[2]);
-    const std::vector<double> fids = wwohos::NapiGetFloat64Array(env, args[3]);
-    const std::vector<std::string> labels = wwohos::NapiGetStringArray(env, args[4]);
+    gcohos::NapiGetInt32(env, args[1], index);
+    const std::vector<double> lonlat = gcohos::NapiGetFloat64Array(env, args[2]);
+    const std::vector<double> fids = gcohos::NapiGetFloat64Array(env, args[3]);
+    const std::vector<std::string> labels = gcohos::NapiGetStringArray(env, args[4]);
     toGlobeEngine(handle)->updateOverlayPoints(index, lonlat, toLongVec(fids), labels);
     return nullptr;
 }
 
 napi_value NativeUpdateOverlayLines(napi_env env, napi_callback_info info) {
     napi_value args[6];
-    wwohos::NapiGetArgs(env, info, 6, args);
+    gcohos::NapiGetArgs(env, info, 6, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1;
-    wwohos::NapiGetInt32(env, args[1], index);
-    const std::vector<double> lonlat = wwohos::NapiGetFloat64Array(env, args[2]);
-    const std::vector<double> vertexCounts = wwohos::NapiGetFloat64Array(env, args[3]);
-    const std::vector<double> fids = wwohos::NapiGetFloat64Array(env, args[4]);
-    const std::vector<std::string> labels = wwohos::NapiGetStringArray(env, args[5]);
+    gcohos::NapiGetInt32(env, args[1], index);
+    const std::vector<double> lonlat = gcohos::NapiGetFloat64Array(env, args[2]);
+    const std::vector<double> vertexCounts = gcohos::NapiGetFloat64Array(env, args[3]);
+    const std::vector<double> fids = gcohos::NapiGetFloat64Array(env, args[4]);
+    const std::vector<std::string> labels = gcohos::NapiGetStringArray(env, args[5]);
     toGlobeEngine(handle)->updateOverlayLines(index, lonlat, toIntVec(vertexCounts), toLongVec(fids),
                                               labels);
     return nullptr;
@@ -631,16 +631,16 @@ napi_value NativeUpdateOverlayLines(napi_env env, napi_callback_info info) {
 
 napi_value NativeUpdateOverlayPolygons(napi_env env, napi_callback_info info) {
     napi_value args[7];
-    wwohos::NapiGetArgs(env, info, 7, args);
+    gcohos::NapiGetArgs(env, info, 7, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1;
-    wwohos::NapiGetInt32(env, args[1], index);
-    const std::vector<double> lonlat = wwohos::NapiGetFloat64Array(env, args[2]);
-    const std::vector<double> ringVertexCounts = wwohos::NapiGetFloat64Array(env, args[3]);
-    const std::vector<double> ringsPerFeature = wwohos::NapiGetFloat64Array(env, args[4]);
-    const std::vector<double> fids = wwohos::NapiGetFloat64Array(env, args[5]);
-    const std::vector<std::string> labels = wwohos::NapiGetStringArray(env, args[6]);
+    gcohos::NapiGetInt32(env, args[1], index);
+    const std::vector<double> lonlat = gcohos::NapiGetFloat64Array(env, args[2]);
+    const std::vector<double> ringVertexCounts = gcohos::NapiGetFloat64Array(env, args[3]);
+    const std::vector<double> ringsPerFeature = gcohos::NapiGetFloat64Array(env, args[4]);
+    const std::vector<double> fids = gcohos::NapiGetFloat64Array(env, args[5]);
+    const std::vector<std::string> labels = gcohos::NapiGetStringArray(env, args[6]);
     toGlobeEngine(handle)->updateOverlayPolygons(index, lonlat, toIntVec(ringVertexCounts),
                                                  toIntVec(ringsPerFeature), toLongVec(fids), labels);
     return nullptr;
@@ -648,33 +648,33 @@ napi_value NativeUpdateOverlayPolygons(napi_env env, napi_callback_info info) {
 
 napi_value NativeRemoveOverlayLayer(napi_env env, napi_callback_info info) {
     napi_value args[2];
-    wwohos::NapiGetArgs(env, info, 2, args);
+    gcohos::NapiGetArgs(env, info, 2, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1;
-    wwohos::NapiGetInt32(env, args[1], index);
+    gcohos::NapiGetInt32(env, args[1], index);
     toGlobeEngine(handle)->removeOverlayLayer(index);
     return nullptr;
 }
 
 napi_value NativeSetOverlayNoPick(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     int32_t index = -1;
     bool noPick = false;
-    wwohos::NapiGetInt32(env, args[1], index);
-    wwohos::NapiGetBool(env, args[2], noPick);
+    gcohos::NapiGetInt32(env, args[1], index);
+    gcohos::NapiGetBool(env, args[2], noPick);
     toGlobeEngine(handle)->setOverlayNoPick(index, noPick);
     return nullptr;
 }
 
 napi_value NativeClearOverlayLayers(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
+    gcohos::NapiGetArgs(env, info, 1, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     toGlobeEngine(handle)->clearOverlayLayers();
     return nullptr;
 }
@@ -683,59 +683,59 @@ napi_value NativeClearOverlayLayers(napi_env env, napi_callback_info info) {
 
 napi_value NativePickVector(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeNull(env);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeNull(env);
     double sx = 0, sy = 0;
-    wwohos::NapiGetDouble(env, args[1], sx);
-    wwohos::NapiGetDouble(env, args[2], sy);
+    gcohos::NapiGetDouble(env, args[1], sx);
+    gcohos::NapiGetDouble(env, args[2], sy);
     int layerIndex = -1;
     long long fid = -1;
-    if (!toGlobeEngine(handle)->pickVector(sx, sy, layerIndex, fid)) return wwohos::NapiMakeNull(env);
+    if (!toGlobeEngine(handle)->pickVector(sx, sy, layerIndex, fid)) return gcohos::NapiMakeNull(env);
     const double buf[2] = {static_cast<double>(layerIndex), static_cast<double>(fid)};
-    return wwohos::NapiMakeFloat64Array(env, buf, 2);
+    return gcohos::NapiMakeFloat64Array(env, buf, 2);
 }
 
 napi_value NativeScreenToGeo(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeNull(env);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeNull(env);
     double sx = 0, sy = 0;
-    wwohos::NapiGetDouble(env, args[1], sx);
-    wwohos::NapiGetDouble(env, args[2], sy);
+    gcohos::NapiGetDouble(env, args[1], sx);
+    gcohos::NapiGetDouble(env, args[2], sy);
     double lon = 0, lat = 0;
-    if (!toGlobeEngine(handle)->screenToGeo(sx, sy, lon, lat)) return wwohos::NapiMakeNull(env);
+    if (!toGlobeEngine(handle)->screenToGeo(sx, sy, lon, lat)) return gcohos::NapiMakeNull(env);
     const double buf[2] = {lon, lat};
-    return wwohos::NapiMakeFloat64Array(env, buf, 2);
+    return gcohos::NapiMakeFloat64Array(env, buf, 2);
 }
 
 /// 命中返回 Array<Float64Array> [ [type], ringCounts, ringsPerFeature, lonlat ]（口径同 JNI double[4][]）
 napi_value NativeFeatureGeometry(napi_env env, napi_callback_info info) {
     napi_value args[3];
-    wwohos::NapiGetArgs(env, info, 3, args);
+    gcohos::NapiGetArgs(env, info, 3, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return wwohos::NapiMakeNull(env);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeNull(env);
     int32_t layerIndex = -1;
     double fidD = 0;
-    wwohos::NapiGetInt32(env, args[1], layerIndex);
-    wwohos::NapiGetDouble(env, args[2], fidD);
+    gcohos::NapiGetInt32(env, args[1], layerIndex);
+    gcohos::NapiGetDouble(env, args[2], fidD);
     int type = -1;
     std::vector<double> lonlat;
     std::vector<int> ringCounts, ringsPerFeature;
     if (!toGlobeEngine(handle)->featureGeometry(layerIndex, static_cast<long long>(fidD), type,
                                                 lonlat, ringCounts, ringsPerFeature)) {
-        return wwohos::NapiMakeNull(env);
+        return gcohos::NapiMakeNull(env);
     }
     std::vector<double> typeVec = {static_cast<double>(type)};
     std::vector<double> ringCountsD(ringCounts.begin(), ringCounts.end());
     std::vector<double> ringsPerFeatureD(ringsPerFeature.begin(), ringsPerFeature.end());
     napi_value result = nullptr;
     napi_create_array_with_length(env, 4, &result);
-    napi_set_element(env, result, 0, wwohos::NapiMakeFloat64Array(env, typeVec));
-    napi_set_element(env, result, 1, wwohos::NapiMakeFloat64Array(env, ringCountsD));
-    napi_set_element(env, result, 2, wwohos::NapiMakeFloat64Array(env, ringsPerFeatureD));
-    napi_set_element(env, result, 3, wwohos::NapiMakeFloat64Array(env, lonlat));
+    napi_set_element(env, result, 0, gcohos::NapiMakeFloat64Array(env, typeVec));
+    napi_set_element(env, result, 1, gcohos::NapiMakeFloat64Array(env, ringCountsD));
+    napi_set_element(env, result, 2, gcohos::NapiMakeFloat64Array(env, ringsPerFeatureD));
+    napi_set_element(env, result, 3, gcohos::NapiMakeFloat64Array(env, lonlat));
     return result;
 }
 
@@ -743,39 +743,39 @@ napi_value NativeFeatureGeometry(napi_env env, napi_callback_info info) {
 
 napi_value NativeSetDisplayDensity(napi_env env, napi_callback_info info) {
     napi_value args[2];
-    wwohos::NapiGetArgs(env, info, 2, args);
+    gcohos::NapiGetArgs(env, info, 2, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     double density = 1;
-    wwohos::NapiGetDouble(env, args[1], density);
+    gcohos::NapiGetDouble(env, args[1], density);
     toGlobeEngine(handle)->setDisplayDensity(density);
     return nullptr;
 }
 
 napi_value NativeSetLocationMarker(napi_env env, napi_callback_info info) {
     napi_value args[5];
-    wwohos::NapiGetArgs(env, info, 5, args);
+    gcohos::NapiGetArgs(env, info, 5, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
     double lon = 0, lat = 0, heading = -1;
     bool visible = false;
-    wwohos::NapiGetDouble(env, args[1], lon);
-    wwohos::NapiGetDouble(env, args[2], lat);
-    wwohos::NapiGetBool(env, args[3], visible);
-    wwohos::NapiGetDouble(env, args[4], heading);
+    gcohos::NapiGetDouble(env, args[1], lon);
+    gcohos::NapiGetDouble(env, args[2], lat);
+    gcohos::NapiGetBool(env, args[3], visible);
+    gcohos::NapiGetDouble(env, args[4], heading);
     toGlobeEngine(handle)->setLocationMarker(lon, lat, visible, heading);
     return nullptr;
 }
 
 napi_value NativeSetLocationMarkerIcon(napi_env env, napi_callback_info info) {
     napi_value args[4];
-    wwohos::NapiGetArgs(env, info, 4, args);
+    gcohos::NapiGetArgs(env, info, 4, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
-    const std::vector<int32_t> argb = wwohos::NapiGetInt32Array(env, args[1]);
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    const std::vector<int32_t> argb = gcohos::NapiGetInt32Array(env, args[1]);
     int32_t w = 0, h = 0;
-    wwohos::NapiGetInt32(env, args[2], w);
-    wwohos::NapiGetInt32(env, args[3], h);
+    gcohos::NapiGetInt32(env, args[2], w);
+    gcohos::NapiGetInt32(env, args[3], h);
     std::vector<uint8_t> rgba = iconArgbToRgba(argb, w, h);
     toGlobeEngine(handle)->setLocationMarkerIcon(std::move(rgba), w, h);
     return nullptr;
@@ -783,10 +783,10 @@ napi_value NativeSetLocationMarkerIcon(napi_env env, napi_callback_info info) {
 
 napi_value NativeSetFontPath(napi_env env, napi_callback_info info) {
     napi_value args[2];
-    wwohos::NapiGetArgs(env, info, 2, args);
+    gcohos::NapiGetArgs(env, info, 2, args);
     int64_t handle = 0;
-    if (!wwohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
-    toGlobeEngine(handle)->setFontPath(wwohos::NapiGetString(env, args[1]));
+    if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return nullptr;
+    toGlobeEngine(handle)->setFontPath(gcohos::NapiGetString(env, args[1]));
     return nullptr;
 }
 
@@ -796,14 +796,14 @@ napi_value NativeSetFontPath(napi_env env, napi_callback_info info) {
 /// 传空串回退引擎默认行为（Android 系统证书目录）。
 napi_value NativeSetCaBundle(napi_env env, napi_callback_info info) {
     napi_value args[1];
-    wwohos::NapiGetArgs(env, info, 1, args);
-    globecore::HttpClient::setCaBundle(wwohos::NapiGetString(env, args[0]));
+    gcohos::NapiGetArgs(env, info, 1, args);
+    globecore::HttpClient::setCaBundle(gcohos::NapiGetString(env, args[0]));
     return nullptr;
 }
 
 } // namespace
 
-namespace wwohos {
+namespace gcohos {
 
 /// 由 napi_init.cpp 统一注册：挂全部 GlobeEngine 导出到 exports（模块名 libglobecore）
 napi_value RegisterGlobeEngine(napi_env env, napi_value exports) {
@@ -852,4 +852,4 @@ napi_value RegisterGlobeEngine(napi_env env, napi_value exports) {
     return exports;
 }
 
-} // namespace wwohos
+} // namespace gcohos

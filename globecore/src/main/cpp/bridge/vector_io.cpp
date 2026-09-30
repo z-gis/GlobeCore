@@ -492,7 +492,7 @@ static void emitLayerFeatures(std::string &out, OGRLayer *layer, const char *pat
     }
 }
 
-namespace wwbridge {
+namespace gcbridge {
 
 std::string readVectorFeatures(const std::string &pathStr,
                                double minLon, double minLat, double maxLon, double maxLat,
@@ -812,7 +812,7 @@ std::string getFeatureAttributes(const std::string &pathStr, long long featureId
     return out;
 }
 
-} // namespace wwbridge
+} // namespace gcbridge
 
 // ── Android JNI 导出薄封装（com.zys.globecore.NativeVector 门面）──
 #if !defined(__OHOS__)
@@ -863,7 +863,7 @@ Java_com_zys_globecore_NativeVector_readVectorFeatures(
     // 任一为 NaN 表示不过滤（Kotlin 侧传入口径，归一后交核心）
     const bool hasFilter = !isnan(minLon) && !isnan(minLat) && !isnan(maxLon) && !isnan(maxLat);
 
-    std::string json = wwbridge::readVectorFeatures(pathStr, minLon, minLat, maxLon, maxLat,
+    std::string json = gcbridge::readVectorFeatures(pathStr, minLon, minLat, maxLon, maxLat,
                                                     hasFilter, includeAll, labelFieldStr,
                                                     simplify, simplifyTol);
     if (json.empty()) return nullptr;
@@ -885,7 +885,7 @@ Java_com_zys_globecore_NativeVector_queryVectorFeatures(
     const std::string sqlText(q);
     env->ReleaseStringUTFChars(sql, q);
 
-    std::string json = wwbridge::queryVectorFeatures(pathStr, sqlText);
+    std::string json = gcbridge::queryVectorFeatures(pathStr, sqlText);
     if (json.empty()) return nullptr;
     return env->NewStringUTF(json.c_str());
 }
@@ -900,7 +900,7 @@ Java_com_zys_globecore_NativeVector_countVectorFeatures(
     if (p == nullptr) return -1;
     const std::string pathStr(p);
     env->ReleaseStringUTFChars(path, p);
-    return (jint) wwbridge::countVectorFeatures(pathStr);
+    return (jint) gcbridge::countVectorFeatures(pathStr);
 }
 
 extern "C"
@@ -916,7 +916,7 @@ Java_com_zys_globecore_NativeVector_updateFeatureAttributes(
     env->ReleaseStringUTFChars(path, p);
     std::vector<std::string> keyList = JStringArrayToVector(env, keys);
     std::vector<std::string> valueList = JStringArrayToVector(env, values);
-    return wwbridge::updateFeatureAttributes(pathStr, (long long) featureId, keyList, valueList)
+    return gcbridge::updateFeatureAttributes(pathStr, (long long) featureId, keyList, valueList)
                ? JNI_TRUE : JNI_FALSE;
 }
 
@@ -930,7 +930,7 @@ Java_com_zys_globecore_NativeVector_getFeatureAttributes(
     if (p == nullptr) return nullptr;
     const std::string pathStr(p);
     env->ReleaseStringUTFChars(path, p);
-    std::string json = wwbridge::getFeatureAttributes(pathStr, (long long) featureId);
+    std::string json = gcbridge::getFeatureAttributes(pathStr, (long long) featureId);
     if (json.empty()) return nullptr;
     return env->NewStringUTF(json.c_str());
 }

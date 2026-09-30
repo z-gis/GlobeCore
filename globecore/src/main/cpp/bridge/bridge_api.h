@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace wwbridge {
+namespace gcbridge {
 
 // ── srs.cpp：PROJ 初始化 / 坐标转换 / 版本 ──
 
@@ -72,6 +72,6 @@ bool updateFeatureAttributes(const std::string &path, long long featureId,
 /// 按 FID 单要素全字段回取（句柄 LRU 缓存复用）：{"fields":{...}}；未找到/打不开返回空串
 std::string getFeatureAttributes(const std::string &path, long long featureId);
 
-} // namespace wwbridge
+} // namespace gcbridge
 
 #endif // GLOBECORE_BRIDGE_API_H

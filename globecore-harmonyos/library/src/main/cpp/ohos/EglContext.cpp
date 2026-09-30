@@ -11,7 +11,7 @@
 #include "core/GlobeEngine.h"
 #include "util/Log.h"
 
-namespace wwohos {
+namespace gcohos {
 
 // ────────────────────────────── EglContext ──────────────────────────────
 
@@ -332,4 +332,4 @@ void MapRenderHost::renderLoop() {
     LOGI("MapRenderHost: render thread exited");
 }
 
-} // namespace wwohos
+} // namespace gcohos
