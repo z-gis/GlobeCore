@@ -1,0 +1,103 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.zys",
+    "module": "globecore",
+    "version": "0.1.1.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.4.1"
+    }
+  },
+  "variants": [
+    {
+      "name": "releaseVariantReleaseApiPublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.4.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "globecore-0.1.1.0.aar",
+          "url": "globecore-0.1.1.0.aar",
+          "size": 17799223,
+          "sha512": "a098409a40fc64d352697d258f3374bf9bc6252560590d207c96a828cef7463add2ddaf0b7cac8f6de13c1fb96c396976d896b3a59b58c2efc5dfcd2e9f9d1a4",
+          "sha256": "743ccccec103dcb28399d66bd4f60d210f231d5d747b5ced2deaee27382eeeb7",
+          "sha1": "f8f5bd53a44a81b9073101a81bd3870289bbda96",
+          "md5": "7d707978dc1a482b5a3da63d1a1d51bd"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseRuntimePublication",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "androidx.core",
+          "module": "core-ktx",
+          "version": {
+            "requires": "1.10.1"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.4.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "globecore-0.1.1.0.aar",
+          "url": "globecore-0.1.1.0.aar",
+          "size": 17799223,
+          "sha512": "a098409a40fc64d352697d258f3374bf9bc6252560590d207c96a828cef7463add2ddaf0b7cac8f6de13c1fb96c396976d896b3a59b58c2efc5dfcd2e9f9d1a4",
+          "sha256": "743ccccec103dcb28399d66bd4f60d210f231d5d747b5ced2deaee27382eeeb7",
+          "sha1": "f8f5bd53a44a81b9073101a81bd3870289bbda96",
+          "md5": "7d707978dc1a482b5a3da63d1a1d51bd"
+        }
+      ]
+    },
+    {
+      "name": "releaseVariantReleaseSourcePublication",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "globecore-0.1.1.0-sources.jar",
+          "url": "globecore-0.1.1.0-sources.jar",
+          "size": 30536,
+          "sha512": "9c6a38e7745d5ca6c70c045bb8329eec75679c5b85fe4874253a98aa7f1e9255b32d41c7833b8214b7d3cf0606919d73e86736b2b8986f1419938d2d597765fd",
+          "sha256": "68248721ff07335f40624b689146d8375679ad35d56e4413a559fe1bfc1172ca",
+          "sha1": "0232052adb295e7b43ae4ab01e64139fee8f7bfa",
+          "md5": "2e2dc5895c34a8b4f60769752722d562"
+        }
+      ]
+    }
+  ]
+}
