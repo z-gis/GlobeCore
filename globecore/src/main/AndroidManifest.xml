@@ -1,6 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- globecore：WorldWind 渲染内核下沉 JNI 的独立库模块，无 UI 组件声明 -->
-
 </manifest>
