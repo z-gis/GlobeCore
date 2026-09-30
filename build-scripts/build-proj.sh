@@ -1,0 +1,59 @@
+
+# Build proj、
+#如果存在build目录，先删除
+if [ -d "proj-9.0.0/build" ]; then
+    rm -rf proj-9.0.0/build
+fi
+
+if [ ! -f proj-9.0.0.tar.gz ]; then
+    wget -q https://download.osgeo.org/proj/proj-9.0.0.tar.gz
+fi
+tar xzf proj-9.0.0.tar.gz
+cd proj-9.0.0
+# 构建目录按目标平台+ABI 隔离，android 历史目录名保持不变（复用已有缓存）
+if [ "$TARGET" = "ohos" ]; then BUILD_TAG="ohos_$ABI"; else BUILD_TAG="$ABI"; fi
+rm -rf build-$BUILD_TAG
+mkdir build-$BUILD_TAG
+cd build-$BUILD_TAG
+
+# See later comment in GDAL build section about MAKE_FIND_ROOT_PATH_MODE_INCLUDE, CMAKE_FIND_ROOT_PATH_MODE_LIBRARY
+# 目标工具链：android 维持历史手写 CMAKE_SYSTEM_NAME 方案；ohos 用官方 ohos.toolchain.cmake
+if [ "$TARGET" = "ohos" ]; then
+cmake .. \
+  -DUSE_CCACHE=OFF \
+  -DENABLE_TIFF=OFF -DENABLE_CURL=OFF -DBUILD_APPS=OFF -DBUILD_TESTING=OFF \
+  -DCMAKE_INSTALL_PREFIX=$PREFIX \
+  $WW_CMAKE_TARGET_ARGS \
+  "-DCMAKE_PREFIX_PATH=$PREFIX;$WW_SYSROOT_USR" \
+  -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=NEVER \
+  -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=NEVER \
+  -DEXE_SQLITE3=/usr/bin/sqlite3 \
+  -DSQLITE3_INCLUDE_DIR=$PREFIX/include \
+  -DSQLITE3_LIBRARY=$PREFIX/lib/libsqlite3.a \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+  -DCMAKE_C_FLAGS="$CFLAGS -DHAVE_PTHREAD_MUTEX_RECURSIVE=1" \
+  -DCMAKE_CXX_FLAGS="$CXXFLAGS -DHAVE_PTHREAD_MUTEX_RECURSIVE=1" \
+  -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS"
+else
+cmake .. \
+  -DUSE_CCACHE=ON \
+  -DENABLE_TIFF=OFF -DENABLE_CURL=OFF -DBUILD_APPS=OFF -DBUILD_TESTING=OFF \
+  -DCMAKE_INSTALL_PREFIX=$PREFIX \
+  -DCMAKE_SYSTEM_NAME=Android \
+  -DCMAKE_ANDROID_NDK=$NDK_ROOT \
+  -DCMAKE_ANDROID_ARCH_ABI=$ABI \
+  -DCMAKE_SYSTEM_VERSION=$API \
+  "-DCMAKE_PREFIX_PATH=$PREFIX;$WW_SYSROOT_USR" \
+  -DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=NEVER \
+  -DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=NEVER \
+  -DEXE_SQLITE3=/usr/bin/sqlite3 \
+  -DBUILD_SHARED_LIBS=OFF \
+  -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+  -DCMAKE_C_FLAGS="$CFLAGS" \
+  -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
+  -DCMAKE_EXE_LINKER_FLAGS="$LDFLAGS"
+fi
+make -j$(nproc)
+make install
+cd $MAIN_DIR

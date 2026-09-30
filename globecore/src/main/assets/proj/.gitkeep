@@ -1,0 +1,2 @@
+# 此占位文件保留 assets/proj 目录；PROJ 运行期数据（proj.db 等）由 build-all 的
+# install_proj_data 在构建时生成，不入版本库。见 .gitignore 与 README。

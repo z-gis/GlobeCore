@@ -1,0 +1,2 @@
+# Keep names -keep-property-name
+# Keep names -keep-global-name

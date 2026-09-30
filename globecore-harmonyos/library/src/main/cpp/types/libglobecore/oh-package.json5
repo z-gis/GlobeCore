@@ -1,0 +1,9 @@
+{
+  "name": "libglobecore.so",
+  "version": "1.1.0",
+  "description": "globecore-harmonyos 自有 native 模块类型声明（so: libglobecore.so，nm_modname: globecore）",
+  "main": "index.d.ts",
+  "types": "index.d.ts",
+  "author": "zys",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 演示应用主题：Material3 NoActionBar，各页自带顶栏 -->
+    <style name="Theme.GlobeCoreAndroid" parent="Theme.Material3.DayNight.NoActionBar" />
+</resources>

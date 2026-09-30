@@ -1,0 +1,29 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "name": "示例面 A" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[116.38, 39.90], [116.42, 39.90], [116.42, 39.93], [116.38, 39.93], [116.38, 39.90]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "示例面 B" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[116.44, 39.88], [116.47, 39.88], [116.47, 39.91], [116.44, 39.91], [116.44, 39.88]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "name": "示例线" },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[116.36, 39.87], [116.40, 39.86], [116.45, 39.865], [116.48, 39.875]]
+      }
+    }
+  ]
+}

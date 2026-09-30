@@ -1,0 +1,42 @@
+{
+  "apiType": "stageMode",
+  "buildOption": {
+    // native 构建：与 Android 侧 globecore 同构的 CMake 工程（引擎源码经 GLOBECORE_ENGINE_ROOT
+    // 直接引用 ../globecore/src/main/cpp，单一源树两端共享）。
+    // 第三方 .a 由 `build-scripts/build-all.sh --target ohos` 产出到 build-scripts/out/ohos/<abi>/。
+    "externalNativeOptions": {
+      "path": "./src/main/cpp/CMakeLists.txt",
+      // 引擎源根 GLOBECORE_ENGINE_ROOT 由 CMakeLists 自行从模块目录向上派生（不在此传相对 -D，
+      // 避免不同构建目录下相对基准漂移）；此处留空作自定义参数挂点
+      "arguments": "",
+      "cppFlags": "",
+      "abiFilters": [
+        "arm64-v8a",
+        "x86_64"
+      ]
+    }
+  },
+  "buildOptionSet": [
+    {
+      "name": "release",
+      "arkOptions": {
+        "obfuscation": {
+          "ruleOptions": {
+            "enable": false,
+            "files": [
+              "./obfuscation-rules.txt"
+            ]
+          },
+          "consumerFiles": [
+            "./consumer-rules.txt"
+          ]
+        }
+      }
+    }
+  ],
+  "targets": [
+    {
+      "name": "default"
+    }
+  ]
+}

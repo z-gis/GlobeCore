@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">GlobeCore 演示</string>
+
+    <!-- 主页菜单 -->
+    <string name="menu_subtitle">globecore 功能演示 · 逐项点击体验</string>
+
+    <string name="demo_basic_title">01 · 瓦片底图（3D）</string>
+    <string name="demo_basic_desc">在线高德影像底图，仅 3D 球体；放大/缩小/旋转/仰角按钮 + 单击取点</string>
+    <string name="demo_globe_title">02 · 2D / 3D 视图切换</string>
+    <string name="demo_globe_desc">在线高德影像底图；平面与球体切换 + 放大/缩小；3D 可旋转/俯仰</string>
+    <string name="demo_vector_title">03 · 矢量图层与拾取</string>
+    <string name="demo_vector_desc">默认 2D 高德影像底图；读取内置 GeoJSON，单击拾取高亮 + 放大/缩小</string>
+    <string name="demo_overlay_title">04 · 动态叠加层绘制</string>
+    <string name="demo_overlay_desc">默认 2D 高德影像底图；单击加点实时绘制折线/多边形（测量）+ 放大/缩小</string>
+    <string name="demo_marker_title">05 · 定位标记（蓝点）</string>
+    <string name="demo_marker_desc">模拟 1Hz 定位回调移动蓝点，带方向箭头</string>
+
+    <!-- 通用操作 -->
+    <string name="action_2d">2D</string>
+    <string name="action_3d">3D</string>
+    <string name="action_add_vector">加载矢量层</string>
+    <string name="action_toggle_line_polygon">切换：多边形</string>
+    <string name="action_undo">撤销点</string>
+    <string name="action_clear">清空</string>
+    <string name="action_start_move">开始移动</string>
+    <string name="action_stop_move">停止移动</string>
+</resources>

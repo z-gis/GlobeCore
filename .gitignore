@@ -1,0 +1,63 @@
+# IDE / Gradle
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+globecore/build/
+globecore-android/build/
+# 通用：忽略任意层级的 Gradle/编译产物目录
+build/
+
+# 第三方预编译静态库：体积巨大（约 450MB/ABI）不入仓（全局忽略所有 *.a，
+# 覆盖 jniLibs/ 与遗留的 jniLibs_bak/）。
+# 获取方式见仓库根 README.md「0 → 1 从零构建」（下载现成产物或按 build-scripts 脚本自行编译）。
+*.a
+
+# include/ 下的三方头（gdal/proj/curl/openssl/sqlite/zlib）由 build-all 的 install_headers 生成，
+# 与 .a 配套，不入仓；stb/ 与 earcut.cpp 为仓库自带 vendored 源，保留跟踪。
+globecore/src/main/cpp/include/gdal/
+globecore/src/main/cpp/include/proj/
+globecore/src/main/cpp/include/curl/
+globecore/src/main/cpp/include/openssl/
+globecore/src/main/cpp/include/sqlite/
+globecore/src/main/cpp/include/zlib.h
+globecore/src/main/cpp/include/zconf.h
+
+# PROJ 运行期数据（proj.db 及格网改正数）由 build-all 的 install_proj_data 生成，不入仓；
+# 保留目录占位。
+globecore/src/main/assets/proj/**
+!globecore/src/main/assets/proj/.gitkeep
+
+# 构建脚本生成的工作区（下载的 NDK/cmake、源码包、编译中间产物、安装前缀）不入仓；
+# build-scripts 只应收录 *.sh 脚本与 README；out/ 为 --target ohos 的 .a 落位目录
+build-scripts/ndk/
+build-scripts/cmake/
+build-scripts/third-party/
+build-scripts/export/
+build-scripts/out/
+build-scripts/**/*.tar.gz
+build-scripts/**/*.zip
+build-scripts/_*
+wget-log*
+
+# PROJ 运行期数据（鸿蒙 HAR rawfile）同样由 build-all --target ohos 生成，不入仓；保留占位
+globecore-harmonyos/library/src/main/resources/rawfile/proj/**
+!globecore-harmonyos/library/src/main/resources/rawfile/proj/.gitkeep
+
+# DevEco / hvigor 构建产物与本地配置（globecore-harmonyos 鸿蒙工程）
+globecore-harmonyos/.idea/
+globecore-harmonyos/**/oh_modules/
+globecore-harmonyos/**/build/
+globecore-harmonyos/.hvigor/
+globecore-harmonyos/.clangd
+globecore-harmonyos/.clang-format
+globecore-harmonyos/.clang-tidy
+globecore-harmonyos/.cxx/
+globecore-harmonyos/local.properties
+
+.kotlin

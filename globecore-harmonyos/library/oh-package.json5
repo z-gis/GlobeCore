@@ -1,0 +1,13 @@
+{
+  "name": "globecore-harmonyos",
+  "version": "1.1.0",
+  "description": "GlobeCore 独立实现 C++ 渲染引擎的鸿蒙（HarmonyOS NEXT）地图渲染 HAR：ArkTS 门面 + NAPI + 共享 C++ 引擎（静态链接 GDAL/PROJ/libcurl 等）",
+  "main": "Index.ets",
+  "author": "zys",
+  "license": "Apache-2.0",
+  "dependencies": {
+    // 自有 native 模块类型声明（so 名 libglobecore.so，nm_modname=globecore）；
+    // ArkTS 门面经 import ww from 'libglobecore.so' 引用
+    //"libglobecore.so": "file:./src/main/cpp/types/libglobecore"
+  }
+}

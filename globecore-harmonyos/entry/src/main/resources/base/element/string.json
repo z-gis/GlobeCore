@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "GlobeCore 鸿蒙演示入口"
+    },
+    {
+      "name": "ability_desc",
+      "value": "GlobeCore 演示能力"
+    },
+    {
+      "name": "ability_label",
+      "value": "GlobeCore"
+    }
+  ]
+}
