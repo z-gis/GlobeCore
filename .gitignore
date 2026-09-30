@@ -60,4 +60,7 @@ globecore-harmonyos/.clang-tidy
 globecore-harmonyos/.cxx/
 globecore-harmonyos/local.properties
 
+操作说明.md
+版本迭代.md
+
 .kotlin
