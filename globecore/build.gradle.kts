@@ -84,7 +84,7 @@ afterEvaluate {
                 version = project.version.toString()
                 pom {
                     name.set("globecore")
-                    description.set("独立实现的 C++ 地图渲染引擎（经 JNI 暴露，参照公开行为独立设计；静态链接 GDAL/PROJ/libcurl 等）")
+                    description.set("独立实现的 C++ 地图渲染引擎（经 JNI 暴露；静态链接 GDAL/PROJ/libcurl 等）")
                     url.set("https://github.com/z-gis/GlobeCore")
                     scm {
                         connection.set("https://github.com/z-gis/GlobeCore.git")
