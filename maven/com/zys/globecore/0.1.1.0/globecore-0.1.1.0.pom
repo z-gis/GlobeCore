@@ -12,7 +12,7 @@
   <version>0.1.1.0</version>
   <packaging>aar</packaging>
   <name>globecore</name>
-  <description>独立实现的 C++ 地图渲染引擎（经 JNI 暴露，参照公开行为独立设计；静态链接 GDAL/PROJ/libcurl 等）</description>
+  <description>独立实现的 C++ 地图渲染引擎（经 JNI 暴露；静态链接 GDAL/PROJ/libcurl 等）</description>
   <url>https://github.com/z-gis/GlobeCore</url>
   <scm>
     <connection>https://github.com/z-gis/GlobeCore.git</connection>
