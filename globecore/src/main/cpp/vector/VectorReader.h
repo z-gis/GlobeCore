@@ -2,6 +2,7 @@
 #define GLOBECORE_VECTOR_VECTORREADER_H
 
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace globecore {
@@ -119,7 +120,8 @@ VectorReadResult readVectorFile(const std::string &path, const std::string &labe
                                 bool hasExtent = false,
                                 double minLon = 0.0, double minLat = 0.0,
                                 double maxLon = 0.0, double maxLat = 0.0,
-                                int maxFeatures = 0);
+                                int maxFeatures = 0,
+                                const std::unordered_map<long long, std::string> *labelFieldOverrides = nullptr);
 
 } // namespace globecore
 

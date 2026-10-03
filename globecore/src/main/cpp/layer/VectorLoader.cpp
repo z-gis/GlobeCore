@@ -101,7 +101,13 @@ void VectorLoader::run() {
             state_ = State::Loading;
         }
         const auto t0 = std::chrono::steady_clock::now();
-        VectorReadResult r = readVectorFile(path_, style_.labelField, hasExtent, a, b, c, d, cap);
+        // 逐要素标注覆盖：从 style_.featureOverrides 提出 fid→标注字段名（含空串=显式关闭），下传读取器按 fid 取文本。
+        // 无覆盖（空）传 nullptr → 读取器仅按整层 labelField（零回归）。
+        std::unordered_map<long long, std::string> labelOv;
+        for (const auto &kv : style_.featureOverrides)
+            if (kv.second.hasLabel) labelOv[kv.first] = kv.second.labelField;
+        VectorReadResult r = readVectorFile(path_, style_.labelField, hasExtent, a, b, c, d, cap,
+                                            labelOv.empty() ? nullptr : &labelOv);
         const auto t1 = std::chrono::steady_clock::now();
         if (abort_.load()) {
             std::lock_guard<std::mutex> lk(mtx_);

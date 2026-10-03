@@ -2,10 +2,36 @@
 #define GLOBECORE_VECTOR_VECTORGEOMETRY_H
 
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace globecore {
+
+/**
+ * 单要素样式覆盖（文档层 VectorStyle.featureStyles 下传子集）：键 = 要素 FID，仅承载渲染相关通道。
+ * hasFill/hasLine 表示该通道是否由用户显式设过（true 才覆盖），未设通道沿用整层/源文件色。
+ * 颜色为 [0,1] RGBA；填充关闭以 alpha=0 表达（仍 hasFill=true）。线宽不支持逐要素（整层 uniform），不在此列。
+ */
+struct FeatureStyleOverride {
+    bool hasFill = false;
+    float fill[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    bool hasLine = false;
+    float line[4] = {0.0f, 0.0f, 0.0f, 1.0f};  // 线要素色，同时作面描边色
+    // 标注覆盖（逐要素，优先级最高）：hasLabel=true 表示该 fid 显式设了标注（labelField 为该要素要标注的字段名，
+    // 由 VectorReader 按 fid 从属性表取文本；空串=显式关闭该要素标注，即便整层设了字段）。
+    // 标注样式各子通道独立门控（hasX=true 才覆盖整层对应通道）：文字色/字号/轮廓开关/轮廓色。
+    bool hasLabel = false;
+    std::string labelField;
+    bool hasLabelColor = false;
+    float labelColor[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+    bool hasLabelSize = false;
+    float labelSize = 1.0f;
+    bool hasLabelOutline = false;
+    bool labelOutlineVal = false;
+    bool hasLabelOutlineColor = false;
+    float labelOutlineColor[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+};
 
 /**
  * 矢量图层样式（对应 app doc/VectorStyle.kt 的渲染相关子集，颜色为 [0,1] 浮点 RGBA）。
@@ -22,6 +48,15 @@ struct VectorStyle {
     // 线要素色 + 线宽（像素）
     float lineR = 0.9f, lineG = 0.42f, lineB = 0.2f, lineA = 1.0f;
     float lineWidth = 2.0f;
+    // 逐要素源文件配色（KML styleUrl）门控：整层是否【显式】设了填充色 / 线·描边色。
+    //   true  = 用户在图层管理设过该通道 → 建几何时以整层色覆盖源文件逐要素原色；
+    //   false（默认）= 未设 → 保留源文件逐要素原色（取舍见 VectorBuilder::buildOne）。
+    // 未显式设时保留原色，正是「无名/靠 styleUrl 型 KML 按原文件渲色」所需；改样式即覆盖对应通道。
+    bool hasFillColor = false;
+    bool hasLineColor = false;
+    // 单要素样式覆盖（fid → 覆盖）：优先级最高，建几何时逐要素据 fid 查表，命中通道覆盖整层/KML 原色。
+    // 空图（默认）= 无单要素覆盖，行为与旧一致（零回归）。
+    std::unordered_map<long long, FeatureStyleOverride> featureOverrides;
     // 点要素色 + 屏幕固定半径（dp，不随缩放变化，复用定位标记口径）
     float pointR = 0.9f, pointG = 0.42f, pointB = 0.2f, pointA = 1.0f;
     float pointRadiusDp = 5.0f;
@@ -59,17 +94,28 @@ struct PickPrimitive {
     std::vector<float> coords;
     std::vector<std::pair<int, int>> ranges;
     std::vector<float> alt, mode; // 逐点对高程（米）/模式（0=贴地,1=baked），仅高程层非空
+    // 该要素本层实际渲染色（[0,1] RGBA，buildOne 按三级优先级算定后烘焙，与 VBO 顶点色一致）：
+    // renderFill=面填充色（点/线为该要素主色），renderLine=描边/线色。供宿主点击回显所见即所得色块
+    // （尤其 KML 逐要素原色，app 无从复现），据此作单要素样式对话框初值。
+    float renderFill[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    float renderLine[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 };
 
 /**
  * 单条矢量要素标注：锚点为「相对图层原点世界坐标」（RTC float32，与渲染顶点同口径），text 为标注文本（UTF-8）。
  * 由 VectorLoader 构建（点要素取点位置、线/面取顶点均值质心，对齐原主界面 centroidOfFlat），
- * 渲染时按屏幕空间 billboard 文本绘制（字号恒定像素、不随缩放变化）。
+ * 渲染时按屏幕空间 billboard 文本绘制（字号恒定像素、不随缩放变）。
+ * 样式（色/字号/轮廓）逐条携带：buildOne 按「整层默认 → 单要素覆盖」解析写入，渲染器直接读逐条值
+ * （无覆盖时即整层值，零回归）。
  */
 struct LabelItem {
     float x = 0.0f;  // 相对图层原点的世界坐标 X
     float y = 0.0f;  // 相对图层原点的世界坐标 Y
     std::string text;
+    float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};            // 文字色（默认白）
+    float size = 1.0f;                                    // 字号缩放
+    bool outline = false;                                 // 是否描边
+    float outlineColor[4] = {0.0f, 0.0f, 0.0f, 1.0f};     // 轮廓色（默认黑）
 };
 
 /**

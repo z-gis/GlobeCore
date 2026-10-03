@@ -5,7 +5,7 @@ import com.zys.globecore.Camera
 import com.zys.globecore.NativeMapView
 
 /**
- * 演示 02 · 2D / 3D 视图切换（0.1.1.1）：在线高德影像底图。
+ * 演示 02 · 2D / 3D 视图切换（0.1.2.0）：在线高德影像底图。
  *  - [com.zys.globecore.NativeMapView.setViewMode]：平面墨卡托正交 ↔ WGS84 球体透视，
  *    两模式共用相机状态，切换保持视角连续、瓦片纹理缓存互通；
  *  - 放大 / 缩小按钮（相机高度读-改-写，两模式均生效）；

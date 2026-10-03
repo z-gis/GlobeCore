@@ -203,8 +203,10 @@ export class NativeLib {
     fillColor: number, outlineColor: number, outlineWidth: number,
     lineColor: number, lineWidth: number,
     pointColor: number, pointRadiusDp: number,
+    fillExplicit: boolean, lineExplicit: boolean,
     labelField: string, labelColor: number, labelSize: number,
     labelOutline: boolean, labelOutlineColor: number,
+    featureStyleOverride: string,
     iconArgb: number[] | undefined | null, iconW: number, iconH: number,
     hasExtent: boolean, minLon: number, minLat: number, maxLon: number, maxLat: number,
     maxFeatures: number): number {
@@ -215,8 +217,10 @@ export class NativeLib {
       toInt32(fillColor), toInt32(outlineColor), outlineWidth,
       toInt32(lineColor), lineWidth,
       toInt32(pointColor), pointRadiusDp,
+      fillExplicit, lineExplicit,
       labelField, toInt32(labelColor), labelSize,
       labelOutline, toInt32(labelOutlineColor),
+      featureStyleOverride,
       toInt32Array(iconArgb), iconW, iconH,
       hasExtent, minLon, minLat, maxLon, maxLat, maxFeatures);
   }

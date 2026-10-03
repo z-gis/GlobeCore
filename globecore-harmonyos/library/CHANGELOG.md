@@ -2,6 +2,11 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.1.2]
+
+### Changed
+- 版本号由 0.1.1 提升至 0.1.2，与 Android 端 0.1.2.0 保持一致。
+
 ## [0.1.1]
 
 ### Added

@@ -5,8 +5,8 @@ HarmonyOS NEXT 侧 ArkTS + **NAPI/HAR**（0.1.1.0 新增，工程见 `globecore-
 门面层（`NativeMapView` 等）只做接口转发，相机、瓦片网格、取瓦片与缓存、矢量读取/三角剖分、
 OpenGL ES 2.0 绘制全部在 native 完成，并内联编译了 GDAL/OGR、PROJ、libcurl 全套第三方静态库能力。
 
-当前版本 **0.1.1.0**：新增 HarmonyOS NEXT（API 12 / 5.0.0）支持，两端共用引擎源；Android 侧仅日志
-分派适配，API 与产物兼容 0.1.0.0。
+当前版本 **0.1.2.0**：修复 KML/KMZ 矢量渲染色两处问题（无名/非 styleUrl 型 KML 未按原文件配色、
+图层管理改整层样式不生效），Android 与 HarmonyOS 两端共用引擎源同步更新，API/ABI 兼容 0.1.1.0。
 
 ## 它是干什么的
 
@@ -201,7 +201,7 @@ android {
     }
 }
 dependencies {
-    implementation("com.zys:globecore:0.1.1.0")   // 自动下载；传递依赖（androidx core-ktx）随之带入
+    implementation("com.zys:globecore:0.1.2.0")   // 自动下载；传递依赖（androidx core-ktx）随之带入
 }
 ```
 
@@ -482,11 +482,18 @@ hdc file send D:\data\sample.shp /data/app/el2/100/base/com.zys.globecore.harmon
 
 ## 版本说明
 
+- **0.1.2.0（当前发布）**：修复两处 KML/KMZ 渲染色问题——① 无名/非 styleUrl 型 KML/KMZ（ArcGIS、
+  MapInfo 导出）按「几何前两个顶点坐标签名」兜底取色，避免要素全无名时按名映射恒空而不按原文件配色；
+  ② 图层管理改「整层样式」生效：新增 `hasFillColor`/`hasLineColor` 按通道覆盖标志，仅在整层未显式设该
+  通道时才用 KML 源色覆盖，使填充/描边颜色可被整层样式覆盖、线宽统一。改动落在 `vector/`（`KmlStyle`、
+  `VectorReader`、`VectorBuilder`、`VectorGeometry`）、`GlobeEngine` 及 JNI/NAPI 桥接与 `VectorStyle` 门面，
+  两端共用引擎源同步；Android `com.zys:globecore:0.1.2.0` 与鸿蒙 `@zys/globecore:0.1.2` 一并发版，
+  API/ABI/产物兼容 0.1.1.0，三方库版本未变更。
 - **0.1.1.1**：Android / HarmonyOS 两端 **demo** 调整（不改库 API/ABI/产物）——删除内置离线基图、默认改高德在线影像；
   演示项按 01 仅 3D（放大/缩小/旋转/仰角按钮）、02 2D/3D 切换、03/04 默认 2D 重排；鸿蒙矢量 demo
   随包 `rawfile/sample.geojson`（解压到 `filesDir`）免推送即可拾取；两端 demo 删除坐标转换演示页（PROJ demo 入口，库 `NativeSrs` 保留），测量叠加层改「顶点标记层 + 几何层」双图层
   （对齐 MobileMap-android），首点即出点给出即时点击反馈。引擎与桥接层零改动。
-- **0.1.1.0（当前发布）**：新增 HarmonyOS NEXT 双平台支持（`globecore-harmonyos` 工程 + `build-scripts --target ohos`）；
+- **0.1.1.0**：新增 HarmonyOS NEXT 双平台支持（`globecore-harmonyos` 工程 + `build-scripts --target ohos`）；
   Android 侧仅 `Log.h` 平台分派适配，API/ABI/产物与 0.1.0.0 完全兼容；三方库版本未变更。
   GitHub Release tag `v0.1.1.0` 与 Maven `com.zys:globecore:0.1.1.0` 发布随本次改造一并打点（发布流程
   见 `.github/workflows/publish-maven.yml`）。

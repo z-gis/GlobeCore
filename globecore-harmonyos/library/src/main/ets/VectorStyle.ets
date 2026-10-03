@@ -28,6 +28,10 @@ export class VectorStyle {
   pointColor: number;
   /** 点要素屏幕固定半径（dp，不随缩放变化） */
   pointRadiusDp: number;
+  /** 整层是否显式设了面填充色：true 时覆盖 KML 逐要素原色；默认 false（保留源文件配色） */
+  fillExplicit: boolean = false;
+  /** 整层是否显式设了线/描边色：true 时覆盖 KML 逐要素原色；默认 false（保留源文件配色） */
+  lineExplicit: boolean = false;
   /** 标注字段名：空则整层不标注（对齐主界面门控） */
   labelField: string;
   /** 标注文字色（#AARRGGBB，默认白） */
@@ -38,6 +42,14 @@ export class VectorStyle {
   labelOutline: boolean;
   /** 标注轮廓色（#AARRGGBB，默认黑） */
   labelOutlineColor: number;
+  /**
+   * 单要素样式覆盖串（文档层 featureStyles 下传）：条目以 ';' 分隔，每条目 8 字段逗号分隔：
+   *   fid,fillArgb,lineArgb,labelFieldName,labelArgb,labelSize,labelOutline,labelOutlineArgb
+   * 各 ARGB 为 #AARRGGBB 无符号十进制，'-'/空 = 该通道未显式设过（继承整层）；
+   * labelFieldName 非 '-' = 该要素标注字段名（空串=显式关闭）。空串=无单要素覆盖（零回归）。
+   * native 解析后逐要素按 fid 命中，优先级高于整层色与 KML 原色（见 VectorBuilder::buildOne / addLabel）。
+   */
+  featureStyleOverride: string = '';
 
   constructor(fillColor: number = VectorStyle.DEFAULT_FILL_COLOR,
     outlineColor: number = VectorStyle.DEFAULT_OUTLINE_COLOR,

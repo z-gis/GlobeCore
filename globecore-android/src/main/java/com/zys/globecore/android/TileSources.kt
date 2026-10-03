@@ -3,7 +3,7 @@ package com.zys.globecore.android
 /**
  * 演示用瓦片图源常量。
  *
- * 0.1.1.1 起 demo 默认使用**高德在线影像瓦片**（无需 token、国内可达），不再内置离线底图；
+ * 0.1.2.0 起 demo 默认使用**高德在线影像瓦片**（无需 token、国内可达），不再内置离线底图；
  * 正式宿主请替换为自己有授权的图源 URL 模板（如天地图，Token 须已替换进模板）。
  */
 object TileSources {
@@ -17,7 +17,7 @@ object TileSources {
 
     /**
      * 高德注记（路网/地名）瓦片：透明 PNG，作 overlay 叠在影像之上（style=8 为注记层，与影像同源子域）。
-     * demo 0.1.1.1 已只保留影像底图（不挂注记层），此常量留存供宿主自行启用。
+     * demo 0.1.2.0 已只保留影像底图（不挂注记层），此常量留存供宿主自行启用。
      */
     const val AMAP_LABEL =
         "https://webst0{rand=1,2,3,4}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}"

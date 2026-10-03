@@ -23,9 +23,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "携带 .har 附件的 GitHub Release tag（如 v0.1.1）"
+        description: "携带 .har 附件的 GitHub Release tag（如 v0.1.2.0）"
         required: true
-        default: "v0.1.1"
+        default: "v0.1.2.0"
 
 permissions:
   contents: read

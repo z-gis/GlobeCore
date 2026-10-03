@@ -74,7 +74,7 @@ abstract class BaseMapActivity : AppCompatActivity() {
     }
 
     /**
-     * 挂在线高德影像底图（0.1.1.1：demo 删除离线基图，默认高德影像）：
+     * 挂在线高德影像底图（0.1.2.0：demo 删除离线基图，默认高德影像）：
      * [NativeMapView.addTileLayer] 影像层（style=6），自带磁盘缓存目录、联网取瓦片
      * （需宿主声明 INTERNET 权限，见 AndroidManifest）。相机定位到 [camera]。
      *

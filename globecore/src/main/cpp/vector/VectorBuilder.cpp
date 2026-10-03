@@ -251,6 +251,20 @@ struct FeatureBaker {
         LabelItem li;
         relF(aLon, aLat, li.x, li.y);
         li.text = f.label;
+        // 标注样式：整层默认为底，命中单要素标注覆盖（fid）逐通道替换（优先级最高）。
+        li.color[0] = s.labelR; li.color[1] = s.labelG; li.color[2] = s.labelB; li.color[3] = s.labelA;
+        li.size = s.labelSize;
+        li.outline = s.labelOutline;
+        li.outlineColor[0] = s.labelOutlineR; li.outlineColor[1] = s.labelOutlineG;
+        li.outlineColor[2] = s.labelOutlineB; li.outlineColor[3] = s.labelOutlineA;
+        const auto lit = s.featureOverrides.find(f.fid);
+        if (lit != s.featureOverrides.end()) {
+            const FeatureStyleOverride &ov = lit->second;
+            if (ov.hasLabelColor) for (int ci = 0; ci < 4; ++ci) li.color[ci] = ov.labelColor[ci];
+            if (ov.hasLabelSize) li.size = ov.labelSize;
+            if (ov.hasLabelOutline) li.outline = ov.labelOutlineVal;
+            if (ov.hasLabelOutlineColor) for (int ci = 0; ci < 4; ++ci) li.outlineColor[ci] = ov.labelOutlineColor[ci];
+        }
         out.labels.push_back(std::move(li));
     }
 
@@ -298,20 +312,42 @@ struct FeatureBaker {
         // 逐要素高程：mode 0/1（仅本层 hasElev 时才写入并行数组）；线/面逐顶点高程取自源 alt 数组。
         const bool featElev = (f.altMode != VecAltMode::Clamp);
         const float fmode = featElev ? 1.0f : 0.0f;
-        // 逐要素 KML 配色（Phase 3）：以整层样式为底，命中 KML 通道则覆盖对应色（RGBA）。
+        // 逐要素 KML 配色（Phase 3）：以整层样式为底；仅当整层【未显式】设该通道时，命中 KML 通道才覆盖对应色（RGBA）。
         //   hasFill→面填充色；hasLine→线要素色，并同时作面描边色（KML 多边形边框取 LineStyle 色）。
+        //   s.hasFillColor/hasLineColor=true 时（用户在图层管理改过填充/线色）不覆盖 → 整层色生效，修「改样式不生效」。
         //   线宽不支持逐要素（渲染期按整层 uniform），宽度沿用 s。extrude 顶盖/侧墙取有效填充 RGB（alpha 仍强制实心）。
         VectorStyle es = s;
-        if (f.style.hasFill) {
+        if (f.style.hasFill && !s.hasFillColor) {
             es.fillR = f.style.fill[0]; es.fillG = f.style.fill[1];
             es.fillB = f.style.fill[2]; es.fillA = f.style.fill[3];
         }
-        if (f.style.hasLine) {
+        if (f.style.hasLine && !s.hasLineColor) {
             es.lineR = f.style.line[0]; es.lineG = f.style.line[1];
             es.lineB = f.style.line[2]; es.lineA = f.style.line[3];
             es.outlineR = es.lineR; es.outlineG = es.lineG;
             es.outlineB = es.lineB; es.outlineA = es.lineA;
         }
+        // 单要素样式覆盖（文档层 featureStyles[fid]，优先级最高）：命中且该通道显式设过即覆盖上一步（整层/KML 原色）。
+        //   填充关闭以 alpha=0 表达；线通道同时驱动线要素色与面描边色（与整层/KML 逻辑同构）。
+        const auto ovIt = s.featureOverrides.find(f.fid);
+        if (ovIt != s.featureOverrides.end()) {
+            const FeatureStyleOverride &ov = ovIt->second;
+            if (ov.hasFill) {
+                es.fillR = ov.fill[0]; es.fillG = ov.fill[1];
+                es.fillB = ov.fill[2]; es.fillA = ov.fill[3];
+            }
+            if (ov.hasLine) {
+                es.lineR = ov.line[0]; es.lineG = ov.line[1];
+                es.lineB = ov.line[2]; es.lineA = ov.line[3];
+                es.outlineR = es.lineR; es.outlineG = es.lineG;
+                es.outlineB = es.lineB; es.outlineA = es.lineA;
+            }
+        }
+        // 本要素实际渲染色快照（供宿主点击回显所见即所得，与上面烘焙进 VBO 的色一致）。
+        const float effFill[4] = {es.fillR, es.fillG, es.fillB, es.fillA};
+        const float effOutline[4] = {es.outlineR, es.outlineG, es.outlineB, es.outlineA};
+        const float effLine[4] = {es.lineR, es.lineG, es.lineB, es.lineA};
+        const float effPoint[4] = {es.pointR, es.pointG, es.pointB, es.pointA};
         if (f.type == VectorGeomType::Point) {
             float rx = 0.0f, ry = 0.0f;
             relF(f.lon, f.lat, rx, ry);
@@ -326,6 +362,10 @@ struct FeatureBaker {
             pp.type = PickType::Point;
             pp.coords.push_back(rx);
             pp.coords.push_back(ry);
+            pp.renderFill[0] = effPoint[0]; pp.renderFill[1] = effPoint[1];
+            pp.renderFill[2] = effPoint[2]; pp.renderFill[3] = effPoint[3];
+            pp.renderLine[0] = effPoint[0]; pp.renderLine[1] = effPoint[1];
+            pp.renderLine[2] = effPoint[2]; pp.renderLine[3] = effPoint[3];
             if (hasElev) {
                 pp.alt.push_back(featElev ? static_cast<float>(f.alt) : 0.0f);
                 pp.mode.push_back(fmode);
@@ -352,7 +392,13 @@ struct FeatureBaker {
                     appendExtrudeWalls(f.parts[k], rAlt,
                                        es.lineR * 0.72f, es.lineG * 0.72f, es.lineB * 0.72f, es.lineA, out);
             }
-            if (!pp.ranges.empty()) out.pickPrims.push_back(std::move(pp));
+            if (!pp.ranges.empty()) {
+                pp.renderFill[0] = effLine[0]; pp.renderFill[1] = effLine[1];
+                pp.renderFill[2] = effLine[2]; pp.renderFill[3] = effLine[3];
+                pp.renderLine[0] = effLine[0]; pp.renderLine[1] = effLine[1];
+                pp.renderLine[2] = effLine[2]; pp.renderLine[3] = effLine[3];
+                out.pickPrims.push_back(std::move(pp));
+            }
             out.msOutline += std::chrono::duration<double, std::milli>(BgClock::now() - lb0).count();
         } else { // Polygon
             if (f.outer.size() < 6) return; // 至少 3 个坐标对
@@ -451,7 +497,13 @@ struct FeatureBaker {
                         (hasElev && hi < f.holesAlt.size()) ? &f.holesAlt[hi] : nullptr;
                 addPickRing(pp, f.holes[hi], hAlt, fmode);
             }
-            if (!pp.ranges.empty()) out.pickPrims.push_back(std::move(pp));
+            if (!pp.ranges.empty()) {
+                pp.renderFill[0] = effFill[0]; pp.renderFill[1] = effFill[1];
+                pp.renderFill[2] = effFill[2]; pp.renderFill[3] = effFill[3];
+                pp.renderLine[0] = effOutline[0]; pp.renderLine[1] = effOutline[1];
+                pp.renderLine[2] = effOutline[2]; pp.renderLine[3] = effOutline[3];
+                out.pickPrims.push_back(std::move(pp));
+            }
             out.msPick += std::chrono::duration<double, std::milli>(BgClock::now() - pb0).count();
         }
     }

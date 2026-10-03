@@ -200,6 +200,13 @@ public:
                          std::vector<int> &outRingCounts,
                          std::vector<int> &outRingsPerFeature) const;
 
+    /// 取指定矢量层某 FID 要素的当前实际渲染色（#AARRGGBB 打包无符号整数），供宿主点击要素弹层
+    /// 色块「所见即所得」回显——尤其 KML 逐要素原色（app 无从复现，仅 native 建几何时按三级优先级算定）。
+    /// 取自拾取图元 pickPrims 的 renderFill/renderLine（与 VBO 顶点色一致），无文件 IO。
+    /// 命中写出 [outFillArgb]/[outLineArgb] 并返回 true；layerIndex 越界、几何未就绪或 fid 未命中返回 false。
+    bool featureRenderColor(int layerIndex, long long fid, unsigned int &outFillArgb,
+                            unsigned int &outLineArgb) const;
+
     /// 设置定位标记的地理坐标、可见性与移动方位角（转发到 [Renderer]，在所有瓦片层之上以屏幕固定尺寸绘制）。
     /// [headingDeg] 顺时针自北 0..360，传入负值则不画方向箭头。变更后若已注入重绘回调则触发一帧重绘。
     void setLocationMarker(double lonDeg, double latDeg, bool visible, double headingDeg);

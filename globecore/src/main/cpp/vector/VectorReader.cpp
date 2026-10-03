@@ -277,6 +277,45 @@ static OGRGeometry *firstLeafGeom(OGRGeometry *g) {
     return g;
 }
 
+/// 取要素几何「前两个坐标点」的 lon/lat，量化为 "%.7f_%.7f[_%.7f_%.7f]"，与 KmlStyle::coordSig 同格式，用于逐要素配色兜底关联。
+/// 下降到 Multi*/GeometryCollection 的首个子几何（合并时=首个子面）；KML 源为经纬度（X=lon、Y=lat）。
+static std::string kmlGeomSig(OGRGeometry *g) {
+    while (g != nullptr) {
+        const OGRwkbGeometryType t = wkbFlatten(g->getGeometryType());
+        if (t == wkbGeometryCollection || t == wkbMultiPoint || t == wkbMultiLineString || t == wkbMultiPolygon) {
+            OGRGeometryCollection *gc = (OGRGeometryCollection *) g;
+            g = gc->getNumGeometries() > 0 ? gc->getGeometryRef(0) : nullptr;
+        } else break;
+    }
+    if (g == nullptr) return std::string();
+    double ax = 0.0, ay = 0.0, bx = 0.0, by = 0.0;
+    int npts = 1;
+    const OGRwkbGeometryType t = wkbFlatten(g->getGeometryType());
+    if (t == wkbPoint) {
+        OGRPoint *p = (OGRPoint *) g; ax = p->getX(); ay = p->getY();
+    } else if (t == wkbLineString) {
+        OGRLineString *l = (OGRLineString *) g;
+        const int m = l->getNumPoints();
+        if (m < 1) return std::string();
+        ax = l->getX(0); ay = l->getY(0);
+        if (m >= 2) { bx = l->getX(1); by = l->getY(1); npts = 2; }
+    } else if (t == wkbPolygon) {
+        OGRPolygon *poly = (OGRPolygon *) g;
+        OGRLinearRing *r = poly->getExteriorRing();
+        if (r == nullptr) return std::string();
+        const int m = r->getNumPoints();
+        if (m < 1) return std::string();
+        ax = r->getX(0); ay = r->getY(0);
+        if (m >= 2) { bx = r->getX(1); by = r->getY(1); npts = 2; }
+    } else {
+        return std::string();
+    }
+    char b[96];
+    if (npts >= 2) snprintf(b, sizeof(b), "%.7f_%.7f_%.7f_%.7f", ax, ay, bx, by);
+    else snprintf(b, sizeof(b), "%.7f_%.7f", ax, ay);
+    return std::string(b);
+}
+
 /**
  * KML/KMZ 可行性探针（一次性、纯只读日志）：实测 LIBKML 读出的
  *  1) 图层字段模式（暴露 altitudeMode/extrude/styleUrl 及可能的配色派生列）；
@@ -378,12 +417,24 @@ static void emitLayerFeatures(std::vector<VectorFeatureData> &out, OGRLayer *lay
                               int &count, bool &truncated, const std::string &labelField,
                               bool hasExtent, double minLon, double minLat, double maxLon, double maxLat,
                               int maxFeatures, int64_t &vertexTotal, int64_t vertexCap, bool &doProbe,
-                              const std::map<std::string, KmlStyleColors> *kmlStyles) {
+                              const KmlStyleIndex *kmlIdx,
+                              const std::unordered_map<long long, std::string> *labelFieldOverrides) {
     if (layer == nullptr || truncated) return;
 
     // 标注字段索引：labelField 为空或图层无该字段时为 -1（不读标注）。
     const int labelIdx = labelField.empty() ? -1
                                             : layer->GetLayerDefn()->GetFieldIndex(labelField.c_str());
+    // 逐要素标注覆盖字段索引缓存（按字段名，图层级）：避免每要素对同一覆盖字段重复 GetFieldIndex。
+    OGRFeatureDefn *featDefn = layer->GetLayerDefn();
+    std::map<std::string, int> fieldIdxCache;
+    if (labelIdx >= 0) fieldIdxCache[labelField] = labelIdx;
+    auto fieldIdx = [&](const std::string &name) -> int {
+        const auto it = fieldIdxCache.find(name);
+        if (it != fieldIdxCache.end()) return it->second;
+        const int idx = featDefn ? featDefn->GetFieldIndex(name.c_str()) : -1;
+        fieldIdxCache[name] = idx;
+        return idx;
+    };
     // 高程模式字段索引（KML/LIBKML 暴露 altitudeMode；非 KML 无此字段 → -1，恒按贴地）。
     const int altModeIdx = layer->GetLayerDefn()->GetFieldIndex("altitudeMode");
     // 拉伸字段索引（KML/LIBKML 暴露 extrude，Integer）；非 KML → -1，恒不拉伸。
@@ -479,6 +530,10 @@ static void emitLayerFeatures(std::vector<VectorFeatureData> &out, OGRLayer *lay
         while (!truncated && (feat = layer->GetNextFeature()) != nullptr) {
             OGRGeometry *geom = feat->GetGeometryRef();
             if (geom != nullptr) {
+                // 兜底配色关联键：几何首点坐标签名（须在重投影前取，KML 源即 WGS84 经纬度）。
+                //   仅当整层无名字（byName 为空、纯无名导出）时才需，避免给有名文件做无用计算。
+                std::string ksig;
+                if (kmlIdx != nullptr && kmlIdx->byName.empty()) ksig = kmlGeomSig(geom);
                 bool pass = true;
                 // 防线 3：候选要素仅变换 envelope 4 角到 WGS84 判相交，跳过屏外要素避免整几何 transform
                 if (hasExtent && ct != nullptr) {
@@ -500,8 +555,21 @@ static void emitLayerFeatures(std::vector<VectorFeatureData> &out, OGRLayer *lay
                 if (pass) {
                     // 就地变换到 WGS84（几何归要素所有，DestroyFeature 时一并释放）
                     if (ct != nullptr) geom->transform(ct);
+                    // 标注文本：命中单要素标注覆盖（按 fid）优先——非空字段名取该字段值、空串显式关闭；
+                    // 未命中覆盖则沿用整层 labelField（fid 键与 buildOne/拾取同源，同一 GDAL 链路内稳定）。
                     std::string label;
-                    if (labelIdx >= 0 && feat->IsFieldSet(labelIdx)) {
+                    const long long featFid = (long long) feat->GetFID();
+                    const std::string *ovField = nullptr;
+                    if (labelFieldOverrides != nullptr) {
+                        const auto oit = labelFieldOverrides->find(featFid);
+                        if (oit != labelFieldOverrides->end()) ovField = &oit->second;
+                    }
+                    if (ovField != nullptr) {
+                        if (!ovField->empty()) {
+                            const int oi = fieldIdx(*ovField);
+                            if (oi >= 0 && feat->IsFieldSet(oi)) label = trimCopy(feat->GetFieldAsString(oi));
+                        }
+                    } else if (labelIdx >= 0 && feat->IsFieldSet(labelIdx)) {
                         label = trimCopy(feat->GetFieldAsString(labelIdx));
                     }
                     // 逐要素高程模式（读 altitudeMode 字段；无字段/未设 → 贴地）
@@ -520,23 +588,36 @@ static void emitLayerFeatures(std::vector<VectorFeatureData> &out, OGRLayer *lay
                         probeKmlFeature(layer, feat, geom);
                         doProbe = false;
                     }
-                    // 逐要素 KML 配色（Phase 3）：GDAL 不暴露 styleUrl/颜色，按 Placemark name 关联自建解析结果。
+                    // 逐要素 KML 配色（Phase 3+）：GDAL 不暴露 styleUrl/颜色。
+                    //   主路径按 Placemark name 关联（有名文件如 KML_Samples，行为同旧）；
+                    //   仅当整层无有名要素（byName 为空，如宁德时代的空名+styleUrl 导出）时，按几何首点坐标签名查 byGeomSig 兜底。
+                    //   签名缺失或该位空色 → 不采用，回退整层默认，绝不产生错色。
                     VecFeatureStyle fs;
-                    if (kmlStyles != nullptr && !kmlStyles->empty() && nameIdx >= 0
-                        && feat->IsFieldSetAndNotNull(nameIdx)) {
-                        const std::string nm = trimCopy(feat->GetFieldAsString(nameIdx));
-                        const auto it = kmlStyles->find(nm);
-                        if (it != kmlStyles->end()) {
-                            const KmlStyleColors &kc = it->second;
-                            fs.hasFill = kc.hasFill;
-                            fs.hasLine = kc.hasLine;
-                            for (int ci = 0; ci < 4; ++ci) { fs.fill[ci] = kc.fill[ci]; fs.line[ci] = kc.line[ci]; }
-                            fs.valid = kc.hasFill || kc.hasLine;
+                    if (kmlIdx != nullptr) {
+                        const KmlStyleColors *picked = nullptr;
+                        if (!kmlIdx->byName.empty() && nameIdx >= 0 && feat->IsFieldSetAndNotNull(nameIdx)) {
+                            const std::string nm = trimCopy(feat->GetFieldAsString(nameIdx));
+                            if (!nm.empty()) {
+                                const auto it = kmlIdx->byName.find(nm);
+                                if (it != kmlIdx->byName.end()) picked = &it->second;
+                            }
+                        }
+                        // 无名兜底：按几何首点坐标签名查表（对 GDAL 的 MultiGeometry 拆分/要素顺序/屏幕过滤全免疫；仅在整层无名字时）。
+                        if (picked == nullptr && kmlIdx->byName.empty() && !ksig.empty()) {
+                            const auto it = kmlIdx->byGeomSig.find(ksig);
+                            if (it != kmlIdx->byGeomSig.end() && (it->second.hasFill || it->second.hasLine))
+                                picked = &it->second;
+                        }
+                        if (picked != nullptr) {
+                            fs.hasFill = picked->hasFill;
+                            fs.hasLine = picked->hasLine;
+                            for (int ci = 0; ci < 4; ++ci) { fs.fill[ci] = picked->fill[ci]; fs.line[ci] = picked->line[ci]; }
+                            fs.valid = picked->hasFill || picked->hasLine;
                         }
                     }
                     // 防线 4：maxFeatures 兜底 + 顶点预算（emitGeometry 内命中任一上限置 truncated）
                     emitGeometry(out, count, truncated, maxFeatures, vertexTotal, vertexCap, geom,
-                                 (long long) feat->GetFID(), label, mode, extrude, fs);
+                                 featFid, label, mode, extrude, fs);
                 }
             }
             OGRFeature::DestroyFeature(feat);
@@ -566,7 +647,8 @@ static void expandBBox(const std::vector<double> &flat, bool &has, double &minX,
 
 VectorReadResult readVectorFile(const std::string &path, const std::string &labelField,
                                 bool hasExtent, double minLon, double minLat,
-                                double maxLon, double maxLat, int maxFeatures) {
+                                double maxLon, double maxLat, int maxFeatures,
+                                const std::unordered_map<long long, std::string> *labelFieldOverrides) {
     VectorReadResult result;
     ensureGdalRegistered();
 
@@ -632,9 +714,9 @@ VectorReadResult readVectorFile(const std::string &path, const std::string &labe
     const bool isKml = isKmlPath(path);
     bool doProbe = isKml;
     // Phase 3 逐要素配色：KML/KMZ 才自建解析样式（GDAL/LIBKML 不返回颜色/styleUrl）；非 KML 或解析空 → 整层默认。
-    std::map<std::string, KmlStyleColors> kmlStyles;
+    KmlStyleIndex kmlStyles;
     if (isKml) kmlStyles = parseKmlStyleMap(path);
-    const std::map<std::string, KmlStyleColors> *kmlStylesPtr = kmlStyles.empty() ? nullptr : &kmlStyles;
+    const KmlStyleIndex *kmlStylesPtr = kmlStyles.empty() ? nullptr : &kmlStyles;
     // 要素容量预留：仅全量模式（无屏幕过滤）按各图层要素总数一次性扩容，免数千要素逐个
     // push_back 反复 realloc 搬迁；屏幕过滤模式命中量取决于视口，不据此预留（避免大文件高估）。
     if (!hasExtent) {
@@ -649,7 +731,7 @@ VectorReadResult readVectorFile(const std::string &path, const std::string &labe
     for (int li = 0; li < layerCount && !truncated; li++) {
         emitLayerFeatures(result.features, ds->GetLayer(li), path.c_str(), count, truncated, labelField,
                           hasExtent, minLon, minLat, maxLon, maxLat, cap, vertexTotal, vertexCap, doProbe,
-                          kmlStylesPtr);
+                          kmlStylesPtr, labelFieldOverrides);
     }
     const auto t2 = std::chrono::steady_clock::now();
     if (truncated) {

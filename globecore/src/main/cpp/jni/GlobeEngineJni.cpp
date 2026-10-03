@@ -6,8 +6,10 @@
 #include <jni.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "core/GlobeEngine.h"
@@ -103,6 +105,68 @@ inline std::vector<std::string> toStringVec(JNIEnv *env, jobjectArray arr) {
             if (u != nullptr) { out[static_cast<size_t>(i)] = u; env->ReleaseStringUTFChars(s, u); }
             env->DeleteLocalRef(s);
         }
+    }
+    return out;
+}
+
+/// 解析单要素样式覆盖串（来自 app 文档层 featureStyles）为 fid → FeatureStyleOverride。
+/// 格式：条目以 ';' 分隔，每条目 8 字段逗号分隔：
+///   fid,fillArgb,lineArgb,labelFieldName,labelArgb,labelSize,labelOutline,labelOutlineArgb
+/// - fillArgb/lineArgb/labelArgb/labelOutlineArgb 为 #AARRGGBB 无符号十进制，'-' 或空 = 该通道未显式设过；
+/// - labelFieldName：'-' 或缺省 = 无逐要素标注覆盖（继承整层）；非 '-' = 该要素标注的字段名（空串 = 显式关闭该要素标注）；
+/// - labelSize：'-' = 继承，否则浮点；labelOutline：'-' = 继承，否则 1/0。
+/// 向后兼容旧 3 字段串（fid,fillArgb,lineArgb）：缺失的标注字段按未设处理。空/非法条目静默跳过。
+inline std::unordered_map<long long, globecore::FeatureStyleOverride> parseFeatureOverrides(const char *s) {
+    std::unordered_map<long long, globecore::FeatureStyleOverride> out;
+    if (s == nullptr) return out;
+    auto unpackTo = [](unsigned int c, float (&dst)[4]) {
+        dst[3] = static_cast<float>((c >> 24) & 0xFF) / 255.0f; // A
+        dst[0] = static_cast<float>((c >> 16) & 0xFF) / 255.0f; // R
+        dst[1] = static_cast<float>((c >> 8) & 0xFF) / 255.0f;  // G
+        dst[2] = static_cast<float>(c & 0xFF) / 255.0f;         // B
+    };
+    // 取第 i 个逗号分隔字段（越界返回 nullptr 表示缺省）；'-' 与空串区分由调用方判 token 内容。
+    const std::string str(s);
+    size_t pos = 0;
+    while (pos < str.size()) {
+        const size_t semi = str.find(';', pos);
+        const std::string entry = str.substr(pos, (semi == std::string::npos) ? std::string::npos : semi - pos);
+        pos = (semi == std::string::npos) ? str.size() : semi + 1;
+        if (entry.empty()) continue;
+        // 切分本条目全部逗号字段
+        std::vector<std::string> tk;
+        size_t p = 0;
+        while (true) {
+            const size_t cm = entry.find(',', p);
+            tk.push_back(entry.substr(p, (cm == std::string::npos) ? std::string::npos : cm - p));
+            if (cm == std::string::npos) break;
+            p = cm + 1;
+        }
+        if (tk.empty()) continue;
+        auto get = [&](size_t i, std::string &v) -> bool {  // true=字段存在且非 '-'（即显式设过）
+            if (i >= tk.size()) return false;
+            const std::string &t = tk[i];
+            if (t.empty() || t == "-") return false;
+            v = t;
+            return true;
+        };
+        globecore::FeatureStyleOverride ov;
+        std::string v;
+        if (get(1, v)) { ov.hasFill = true; unpackTo(static_cast<unsigned int>(strtoull(v.c_str(), nullptr, 10)), ov.fill); }
+        if (get(2, v)) { ov.hasLine = true; unpackTo(static_cast<unsigned int>(strtoull(v.c_str(), nullptr, 10)), ov.line); }
+        // labelFieldName（索引 3）：区分 '-'（缺字段 get 返回 false）与显式关闭（字段存在但为空串）。
+        // get() 把空串也当未设，故此处单独判：字段存在且 != '-' 即 hasLabel=true，其值（可能空串）= labelField。
+        if (tk.size() > 3 && tk[3] != "-") {
+            ov.hasLabel = true;
+            ov.labelField = tk[3];  // 空串 = 显式关闭；非空 = 标注字段名（可含非 ASCII，原样传递）
+        }
+        if (get(4, v)) { ov.hasLabelColor = true; unpackTo(static_cast<unsigned int>(strtoull(v.c_str(), nullptr, 10)), ov.labelColor); }
+        if (get(5, v)) { ov.hasLabelSize = true; ov.labelSize = static_cast<float>(strtod(v.c_str(), nullptr)); }
+        if (get(6, v)) { ov.hasLabelOutline = true; ov.labelOutlineVal = (v[0] == '1'); }
+        if (get(7, v)) { ov.hasLabelOutlineColor = true; unpackTo(static_cast<unsigned int>(strtoull(v.c_str(), nullptr, 10)), ov.labelOutlineColor); }
+        if (ov.hasFill || ov.hasLine || ov.hasLabel || ov.hasLabelColor || ov.hasLabelSize ||
+            ov.hasLabelOutline || ov.hasLabelOutlineColor)
+            out[strtoll(tk[0].c_str(), nullptr, 10)] = ov;
     }
     return out;
 }
@@ -309,8 +373,10 @@ Java_com_zys_globecore_NativeLib_nativeAddVectorLayer(JNIEnv *env, jobject /*thi
                                                          jint fillColor, jint outlineColor, jfloat outlineWidth,
                                                          jint lineColor, jfloat lineWidth,
                                                          jint pointColor, jfloat pointRadiusDp,
+                                                         jboolean hasFillColor, jboolean hasLineColor,
                                                          jstring labelField, jint labelColor, jfloat labelSize,
                                                          jboolean labelOutline, jint labelOutlineColor,
+                                                         jstring featureStyleOverride,
                                                          jintArray iconArgb, jint iconW, jint iconH,
                                                          jboolean hasExtent, jdouble minLon, jdouble minLat,
                                                          jdouble maxLon, jdouble maxLat, jint maxFeatures) {
@@ -326,6 +392,9 @@ Java_com_zys_globecore_NativeLib_nativeAddVectorLayer(JNIEnv *env, jobject /*thi
     style.lineWidth = lineWidth;
     unpackArgb(pointColor, style.pointR, style.pointG, style.pointB, style.pointA);
     style.pointRadiusDp = pointRadiusDp;
+    // 逐要素源文件配色门控：整层显式设了该通道则不被 KML 原色覆盖（图层管理改样式即时生效）。
+    style.hasFillColor = (hasFillColor == JNI_TRUE);
+    style.hasLineColor = (hasLineColor == JNI_TRUE);
     // 标注样式：labelField 为空则整层不标注（对齐主界面门控）
     if (labelField != nullptr) {
         const char *lfUtf = env->GetStringUTFChars(labelField, nullptr);
@@ -338,6 +407,12 @@ Java_com_zys_globecore_NativeLib_nativeAddVectorLayer(JNIEnv *env, jobject /*thi
     style.labelSize = labelSize;
     style.labelOutline = (labelOutline == JNI_TRUE);
     unpackArgb(labelOutlineColor, style.labelOutlineR, style.labelOutlineG, style.labelOutlineB, style.labelOutlineA);
+    // 单要素样式覆盖：解析下传串入 style.featureOverrides（建几何时逐要素按 fid 命中覆盖）。
+    if (featureStyleOverride != nullptr) {
+        const char *ovUtf = env->GetStringUTFChars(featureStyleOverride, nullptr);
+        style.featureOverrides = parseFeatureOverrides(ovUtf);
+        if (ovUtf != nullptr) env->ReleaseStringUTFChars(featureStyleOverride, ovUtf);
+    }
 
     // 点要素图标：Android ARGB(0xAARRGGBB) IntArray → RGBA 字节（供 native 上传纹理、billboard 渲染）。
     // 尺寸不匹配或无图标时 iconRgba 留空 → 点要素回退画屏幕固定圆。
@@ -570,6 +645,22 @@ Java_com_zys_globecore_NativeLib_nativeFeatureGeometry(JNIEnv *env, jobject /*th
     setSlot(3, lonlat);
     env->DeleteLocalRef(dblArrCls);
     return result;
+}
+
+// 取指定矢量层某 FID 要素的当前实际渲染色：返回 [fillArgb, lineArgb]（#AARRGGBB 打包 Int，含符号位），
+// 未命中/几何未就绪返回 null。供宿主点击要素弹层色块「所见即所得」回显（尤其 KML 逐要素原色）。
+JNIEXPORT jintArray JNICALL
+Java_com_zys_globecore_NativeLib_nativeFeatureRenderColor(JNIEnv *env, jobject /*thiz*/, jlong handle,
+                                                             jint index, jlong fid) {
+    if (handle == 0) return nullptr;
+    unsigned int fill = 0, line = 0;
+    if (!toGlobeEngine(handle)->featureRenderColor(index, static_cast<long long>(fid), fill, line))
+        return nullptr;
+    jintArray arr = env->NewIntArray(2);
+    if (arr == nullptr) return nullptr;
+    const jint buf[2] = {static_cast<jint>(fill), static_cast<jint>(line)};
+    env->SetIntArrayRegion(arr, 0, 2, buf);
+    return arr;
 }
 
 // 设置屏幕密度（displayMetrics.density），作为 LOD 细分判据的 densityFactor（对齐 参考实现 setupViewport）

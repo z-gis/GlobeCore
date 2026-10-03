@@ -123,9 +123,14 @@ export struct NativeMapView {
   }
 
   /**
-   * 设置单击回调：native 手势识别确认单击时触发（已避开双击缩放与拖动平移），坐标为视图内 vp。
+   * 设置单击回调：native 手势识别确认单击时触发（已避开双击缩放与拖动平移）。
    * 事件源在 native（SURFACE 触摸不进 ArkTS .onTouch），经 NAPI threadsafe function 转投主线程；
    * 注册时机自由（attach 前注册由 native 在 attach 时补装），传 undefined 反注册。
+   *
+   * 单位口径：native 触摸坐标（OH_NativeXComponent_TouchEvent.x/y）本身就是 px（物理像素），
+   * 与引擎视口（screenToGeo/pickVector 的换算分母，同为 surface px）天然一致，故原样透出、无需
+   * 密度换算。切勿再乘 density：否则坐标会被顶到视口外（x>viewportWidth），screenToGeo 只能外推出
+   * 错误经纬度——表现为「toast 数值正常、但测点/面画在可见区外、地图上看不到绘制」。
    */
   setOnTapListener(listener: ((x: number, y: number) => void) | undefined): void {
     this.tapListener = listener;
@@ -222,8 +227,10 @@ export struct NativeMapView {
     const index = NativeLib.nativeAddVectorLayer(this.nativeHandle, path,
       style.fillColor, style.outlineColor, style.outlineWidth,
       style.lineColor, style.lineWidth, style.pointColor, style.pointRadiusDp,
+      style.fillExplicit, style.lineExplicit,
       style.labelField, style.labelColor, style.labelSize,
       style.labelOutline, style.labelOutlineColor,
+      style.featureStyleOverride,
       iconArgb, iconW, iconH,
       extent !== undefined && extent !== null,
       extent !== undefined && extent !== null ? extent.minLon : 0.0,
@@ -338,20 +345,20 @@ export struct NativeMapView {
   }
 
   /**
-   * 拾取矢量要素：屏幕点（vp）命中可见矢量层，命中返回 [PickResult]，未命中 undefined。
+   * 拾取矢量要素：屏幕点（px，与引擎视口同口径）命中可见矢量层，命中返回 [PickResult]，未命中 undefined。
    * 先动态叠加层后文件层，各阶段内后加入优先；noPick 层跳过。仅读 native CPU 几何，可主线程调用。
    */
-  pickVector(sxVp: number, syVp: number): PickResult | undefined {
-    const hit = NativeLib.nativePickVector(this.nativeHandle, sxVp, syVp);
+  pickVector(sxPx: number, syPx: number): PickResult | undefined {
+    const hit = NativeLib.nativePickVector(this.nativeHandle, sxPx, syPx);
     if (hit === null || hit.length < 2) {
       return undefined;
     }
     return new PickResult(Math.trunc(hit[0]), hit[1]);
   }
 
-  /** 屏幕点（vp）→ 地理坐标 [Position]；视口未就绪或句柄已释放返回 undefined */
-  screenToGeo(sxVp: number, syVp: number): Position | undefined {
-    const geo = NativeLib.nativeScreenToGeo(this.nativeHandle, sxVp, syVp);
+  /** 屏幕点（px，与引擎视口同口径）→ 地理坐标 [Position]；视口未就绪或句柄已释放返回 undefined */
+  screenToGeo(sxPx: number, syPx: number): Position | undefined {
+    const geo = NativeLib.nativeScreenToGeo(this.nativeHandle, sxPx, syPx);
     if (geo === null || geo.length < 2) {
       return undefined;
     }

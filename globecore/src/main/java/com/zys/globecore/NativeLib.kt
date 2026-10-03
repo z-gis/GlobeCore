@@ -114,8 +114,10 @@ internal object NativeLib {
         fillColor: Int, outlineColor: Int, outlineWidth: Float,
         lineColor: Int, lineWidth: Float,
         pointColor: Int, pointRadiusDp: Float,
+        fillExplicit: Boolean, lineExplicit: Boolean,
         labelField: String, labelColor: Int, labelSize: Float,
         labelOutline: Boolean, labelOutlineColor: Int,
+        featureStyleOverride: String,
         iconArgb: IntArray?, iconW: Int, iconH: Int,
         hasExtent: Boolean, minLon: Double, minLat: Double, maxLon: Double, maxLat: Double, maxFeatures: Int
     ): Int
@@ -226,6 +228,13 @@ internal object NativeLib {
      * 未命中或句柄已释放返回 null。供宿主点击选中后画高亮叠加层。仅读 native CPU 几何、不涉 GL，可在主线程调用。
      */
     external fun nativeFeatureGeometry(handle: Long, layerIndex: Int, fid: Long): Array<DoubleArray>?
+
+    /**
+     * 取指定矢量层某 FID 要素的当前实际渲染色：命中返回 `[fillArgb, lineArgb]`（均为 #AARRGGBB 打包 Int），
+     * 未命中/几何未就绪/句柄已释放返回 null。供宿主点击要素弹层色块「所见即所得」回显（尤其 KML 逐要素原色）。
+     * 仅读 native CPU 几何、不涉 GL，可在主线程调用。
+     */
+    external fun nativeFeatureRenderColor(handle: Long, layerIndex: Int, fid: Long): IntArray?
 
     /** 设置屏幕密度（`displayMetrics.density`），作为 LOD 细分判据的 densityFactor（对齐 参考实现 `setupViewport(w,h,density)`） */
     external fun nativeSetDisplayDensity(handle: Long, density: Double)

@@ -13,6 +13,7 @@
 #include <napi/native_api.h>
 
 #include <cstdint>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -77,8 +78,9 @@ std::function<void(float, float)> MakeTapDispatcher(int64_t handle) {
     napi_threadsafe_function tsfn = it->second.tsfn;
     return [tsfn](float x, float y) {
         auto *pack = new TapPack{x, y};
+        // 非阻塞入队：队列满/已销毁则丢弃本次单击（宁缺勿悬），转投 JS 主线程
         if (napi_call_threadsafe_function(tsfn, pack, napi_tsfn_nonblocking) != napi_ok) {
-            delete pack; // 队列已销毁/满：丢弃本次单击（宁缺勿悬）
+            delete pack;
         }
     };
 }
@@ -130,6 +132,64 @@ inline std::vector<int> toIntVec(const std::vector<double> &v) {
     std::vector<int> out;
     out.reserve(v.size());
     for (double d : v) out.push_back(static_cast<int>(d));
+    return out;
+}
+
+/// 解析单要素样式覆盖串（来自 app 文档层 featureStyles）为 fid → FeatureStyleOverride，
+/// 逻辑与 Android GlobeEngineJni.cpp parseFeatureOverrides 逐字节一致（共用同一 native 引擎，仅桥接层不同）。
+/// 条目以 ';' 分隔，每条目 8 字段逗号分隔：
+///   fid,fillArgb,lineArgb,labelFieldName,labelArgb,labelSize,labelOutline,labelOutlineArgb
+/// - fillArgb/lineArgb/labelArgb/labelOutlineArgb 为 #AARRGGBB 无符号十进制，'-' 或空 = 该通道未显式设过；
+/// - labelFieldName：'-' 或缺省 = 无逐要素标注覆盖（继承整层）；非 '-' = 该要素标注字段名（空串 = 显式关闭）；
+/// - labelSize：'-' = 继承，否则浮点；labelOutline：'-' = 继承，否则 1/0。向后兼容旧 3 字段串。空串返回空表（零回归）。
+inline std::unordered_map<long long, globecore::FeatureStyleOverride> parseFeatureOverrides(const std::string &s) {
+    std::unordered_map<long long, globecore::FeatureStyleOverride> out;
+    if (s.empty()) return out;
+    auto unpackTo = [](unsigned int c, float (&dst)[4]) {
+        dst[3] = static_cast<float>((c >> 24) & 0xFF) / 255.0f; // A
+        dst[0] = static_cast<float>((c >> 16) & 0xFF) / 255.0f; // R
+        dst[1] = static_cast<float>((c >> 8) & 0xFF) / 255.0f;  // G
+        dst[2] = static_cast<float>(c & 0xFF) / 255.0f;         // B
+    };
+    size_t pos = 0;
+    while (pos < s.size()) {
+        const size_t semi = s.find(';', pos);
+        const std::string entry = s.substr(pos, (semi == std::string::npos) ? std::string::npos : semi - pos);
+        pos = (semi == std::string::npos) ? s.size() : semi + 1;
+        if (entry.empty()) continue;
+        std::vector<std::string> tk;
+        size_t p = 0;
+        while (true) {
+            const size_t cm = entry.find(',', p);
+            tk.push_back(entry.substr(p, (cm == std::string::npos) ? std::string::npos : cm - p));
+            if (cm == std::string::npos) break;
+            p = cm + 1;
+        }
+        if (tk.empty()) continue;
+        auto get = [&](size_t i, std::string &v) -> bool {  // true=字段存在且非 '-'（即显式设过）
+            if (i >= tk.size()) return false;
+            const std::string &t = tk[i];
+            if (t.empty() || t == "-") return false;
+            v = t;
+            return true;
+        };
+        globecore::FeatureStyleOverride ov;
+        std::string v;
+        if (get(1, v)) { ov.hasFill = true; unpackTo(static_cast<unsigned int>(strtoull(v.c_str(), nullptr, 10)), ov.fill); }
+        if (get(2, v)) { ov.hasLine = true; unpackTo(static_cast<unsigned int>(strtoull(v.c_str(), nullptr, 10)), ov.line); }
+        // labelFieldName（索引 3）：区分 '-'（缺字段）与显式关闭（字段存在但为空串），故不走 get()。
+        if (tk.size() > 3 && tk[3] != "-") {
+            ov.hasLabel = true;
+            ov.labelField = tk[3];  // 空串 = 显式关闭；非空 = 标注字段名（可含非 ASCII，原样传递）
+        }
+        if (get(4, v)) { ov.hasLabelColor = true; unpackTo(static_cast<unsigned int>(strtoull(v.c_str(), nullptr, 10)), ov.labelColor); }
+        if (get(5, v)) { ov.hasLabelSize = true; ov.labelSize = static_cast<float>(strtod(v.c_str(), nullptr)); }
+        if (get(6, v)) { ov.hasLabelOutline = true; ov.labelOutlineVal = (v[0] == '1'); }
+        if (get(7, v)) { ov.hasLabelOutlineColor = true; unpackTo(static_cast<unsigned int>(strtoull(v.c_str(), nullptr, 10)), ov.labelOutlineColor); }
+        if (ov.hasFill || ov.hasLine || ov.hasLabel || ov.hasLabelColor || ov.hasLabelSize ||
+            ov.hasLabelOutline || ov.hasLabelOutlineColor)
+            out[strtoll(tk[0].c_str(), nullptr, 10)] = ov;
+    }
     return out;
 }
 
@@ -422,8 +482,8 @@ napi_value NativeAddRasterLayer(napi_env env, napi_callback_info info) {
 // ── 矢量图层 ──
 
 napi_value NativeAddVectorLayer(napi_env env, napi_callback_info info) {
-    napi_value args[23];
-    gcohos::NapiGetArgs(env, info, 23, args);
+    napi_value args[26];
+    gcohos::NapiGetArgs(env, info, 26, args);
     int64_t handle = 0;
     if (!gcohos::NapiGetInt64(env, args[0], handle) || handle == 0) return gcohos::NapiMakeInt32(env, -1);
     const std::string path = gcohos::NapiGetString(env, args[1]);
@@ -432,7 +492,7 @@ napi_value NativeAddVectorLayer(napi_env env, napi_callback_info info) {
     int32_t fillColor = 0, outlineColor = 0, lineColor = 0, pointColor = 0;
     int32_t labelColor = 0, labelOutlineColor = 0;
     double outlineWidth = 0, lineWidth = 0, pointRadiusDp = 0, labelSize = 0;
-    bool labelOutline = false;
+    bool fillExplicit = false, lineExplicit = false, labelOutline = false;
     gcohos::NapiGetInt32(env, args[2], fillColor);
     gcohos::NapiGetInt32(env, args[3], outlineColor);
     gcohos::NapiGetDouble(env, args[4], outlineWidth);
@@ -440,25 +500,29 @@ napi_value NativeAddVectorLayer(napi_env env, napi_callback_info info) {
     gcohos::NapiGetDouble(env, args[6], lineWidth);
     gcohos::NapiGetInt32(env, args[7], pointColor);
     gcohos::NapiGetDouble(env, args[8], pointRadiusDp);
-    const std::string labelField = gcohos::NapiGetString(env, args[9]);
-    gcohos::NapiGetInt32(env, args[10], labelColor);
-    gcohos::NapiGetDouble(env, args[11], labelSize);
-    gcohos::NapiGetBool(env, args[12], labelOutline);
-    gcohos::NapiGetInt32(env, args[13], labelOutlineColor);
-    const std::vector<int32_t> iconArgb = gcohos::NapiGetInt32Array(env, args[14]);
+    gcohos::NapiGetBool(env, args[9], fillExplicit);
+    gcohos::NapiGetBool(env, args[10], lineExplicit);
+    const std::string labelField = gcohos::NapiGetString(env, args[11]);
+    gcohos::NapiGetInt32(env, args[12], labelColor);
+    gcohos::NapiGetDouble(env, args[13], labelSize);
+    gcohos::NapiGetBool(env, args[14], labelOutline);
+    gcohos::NapiGetInt32(env, args[15], labelOutlineColor);
+    // 单要素样式覆盖串（fid,fillArgb,lineArgb,labelFieldName,labelArgb,labelSize,labelOutline,labelOutlineArgb）
+    const std::string featureStyleOverride = gcohos::NapiGetString(env, args[16]);
+    const std::vector<int32_t> iconArgb = gcohos::NapiGetInt32Array(env, args[17]);
     int32_t iconW = 0, iconH = 0;
-    gcohos::NapiGetInt32(env, args[15], iconW);
-    gcohos::NapiGetInt32(env, args[16], iconH);
+    gcohos::NapiGetInt32(env, args[18], iconW);
+    gcohos::NapiGetInt32(env, args[19], iconH);
     bool hasExtent = false;
-    gcohos::NapiGetBool(env, args[17], hasExtent);
+    gcohos::NapiGetBool(env, args[20], hasExtent);
     double minLon = 0, minLat = 0, maxLon = 0, maxLat = 0;
-    gcohos::NapiGetDouble(env, args[18], minLon);
-    gcohos::NapiGetDouble(env, args[19], minLat);
-    gcohos::NapiGetDouble(env, args[20], maxLon);
-    gcohos::NapiGetDouble(env, args[21], maxLat);
-    // maxFeatures 为第 23 个参数（NativeLib.kt 末位，缺省 0 = 引擎默认上限）
+    gcohos::NapiGetDouble(env, args[21], minLon);
+    gcohos::NapiGetDouble(env, args[22], minLat);
+    gcohos::NapiGetDouble(env, args[23], maxLon);
+    gcohos::NapiGetDouble(env, args[24], maxLat);
+    // maxFeatures 为第 26 个参数（NativeLib 末位，缺省 0 = 引擎默认上限）
     int32_t maxFeatures = 0;
-    if (args[22] != nullptr) gcohos::NapiGetInt32(env, args[22], maxFeatures);
+    if (args[25] != nullptr) gcohos::NapiGetInt32(env, args[25], maxFeatures);
 
     globecore::VectorStyle style;
     unpackArgb(fillColor, style.fillR, style.fillG, style.fillB, style.fillA);
@@ -468,12 +532,17 @@ napi_value NativeAddVectorLayer(napi_env env, napi_callback_info info) {
     style.lineWidth = static_cast<float>(lineWidth);
     unpackArgb(pointColor, style.pointR, style.pointG, style.pointB, style.pointA);
     style.pointRadiusDp = static_cast<float>(pointRadiusDp);
+    // 逐要素源文件配色门控：整层显式设了该通道则不被 KML 原色覆盖（图层管理改样式即时生效）。
+    style.hasFillColor = fillExplicit;
+    style.hasLineColor = lineExplicit;
     style.labelField = labelField; // 空则整层不标注（对齐主界面门控）
     unpackArgb(labelColor, style.labelR, style.labelG, style.labelB, style.labelA);
     style.labelSize = static_cast<float>(labelSize);
     style.labelOutline = labelOutline;
     unpackArgb(labelOutlineColor, style.labelOutlineR, style.labelOutlineG, style.labelOutlineB,
                style.labelOutlineA);
+    // 单要素样式覆盖：解析下传串入 style.featureOverrides（建几何时逐要素按 fid 命中覆盖颜色/标注）。
+    style.featureOverrides = parseFeatureOverrides(featureStyleOverride);
 
     std::vector<uint8_t> iconRgba = iconArgbToRgba(iconArgb, iconW, iconH);
     const int index = toGlobeEngine(handle)->addVectorLayer(

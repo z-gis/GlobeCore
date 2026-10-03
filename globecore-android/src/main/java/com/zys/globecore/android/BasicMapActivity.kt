@@ -5,7 +5,7 @@ import com.zys.globecore.Camera
 import com.zys.globecore.NativeMapView
 
 /**
- * 演示 01 · 瓦片底图（0.1.1.1）：**只呈现 3D 球体模式**，在线高德影像底图。
+ * 演示 01 · 瓦片底图（0.1.2.0）：**只呈现 3D 球体模式**，在线高德影像底图。
  *  - [com.zys.globecore.NativeMapView.addTileLayer]：影像层（联网取瓦片）；
  *  - [com.zys.globecore.NativeMapView.setViewMode]：进入即锁定 3D（本演示不提供 2D 切换，2D 见演示 02）；
  *  - 顶栏动作按钮：放大 / 缩小 / 旋转 ± / 仰角 ±（经相机读-改-写驱动，旋转与俯仰仅 3D 显效）；

@@ -216,6 +216,12 @@ inline void computeOverlayBBox(VectorReadResult &r) {
     double minLon = 180.0, minLat = 90.0, maxLon = -180.0, maxLat = -90.0;
     bool any = false;
     auto acc = [&](double lon, double lat) {
+        // 脏坐标守卫：跳过非有限（NaN/Inf）或超出 WGS84 有效范围的经纬度。
+        // 单个坏点若计入，会把 bbox 中心（图层 RTC 原点 originWx/originWy）撑成天文数字；
+        // 由于投影经度不钳制（wx=(lon+180)/360）、纬度钳制，干净标注转 float 相对坐标时
+        // 仅 X 轴溢出为 ±inf → 整层文字飞出视口消失（图形层自身 bbox 干净则仍正常）。
+        if (!std::isfinite(lon) || !std::isfinite(lat)) return;
+        if (lon < -180.0 || lon > 180.0 || lat < -90.0 || lat > 90.0) return;
         if (lon < minLon) minLon = lon;
         if (lat < minLat) minLat = lat;
         if (lon > maxLon) maxLon = lon;
@@ -257,7 +263,8 @@ void GlobeEngine::updateOverlayPoints(int index, const std::vector<double> &lonl
                                       const std::vector<std::string> &labels) {
     if (index < 0 || static_cast<size_t>(index) >= vectorLayers_.size()) return;
     VectorLayer &vl = *vectorLayers_[static_cast<size_t>(index)];
-    if (!vl.isOverlay || vl.dead || !vl.loader) return;
+    if (!vl.isOverlay || !vl.loader) return;
+    if (vl.dead) return; // 叠加层已失效（被 remove/clear）：静默丢弃写入，不写不可呈现的层
 
     VectorReadResult r;
     r.ok = true;
@@ -283,7 +290,8 @@ void GlobeEngine::updateOverlayLines(int index, const std::vector<double> &lonla
                                      const std::vector<std::string> &labels) {
     if (index < 0 || static_cast<size_t>(index) >= vectorLayers_.size()) return;
     VectorLayer &vl = *vectorLayers_[static_cast<size_t>(index)];
-    if (!vl.isOverlay || vl.dead || !vl.loader) return;
+    if (!vl.isOverlay || !vl.loader) return;
+    if (vl.dead) return; // 叠加层已失效（被 remove/clear）：静默丢弃写入，不写不可呈现的层
 
     VectorReadResult r;
     r.ok = true;
@@ -319,7 +327,8 @@ void GlobeEngine::updateOverlayPolygons(int index, const std::vector<double> &lo
                                         const std::vector<std::string> &labels) {
     if (index < 0 || static_cast<size_t>(index) >= vectorLayers_.size()) return;
     VectorLayer &vl = *vectorLayers_[static_cast<size_t>(index)];
-    if (!vl.isOverlay || vl.dead || !vl.loader) return;
+    if (!vl.isOverlay || !vl.loader) return;
+    if (vl.dead) return; // 叠加层已失效（被 remove/clear）：静默丢弃写入，不写不可呈现的层
 
     VectorReadResult r;
     r.ok = true;
@@ -493,6 +502,29 @@ bool GlobeEngine::featureGeometry(int layerIndex, long long fid, int &outType,
         outRingsPerFeature.push_back(pushRanges());
     }
     return true;
+}
+
+bool GlobeEngine::featureRenderColor(int layerIndex, long long fid, unsigned int &outFillArgb,
+                                     unsigned int &outLineArgb) const {
+    if (layerIndex < 0 || layerIndex >= static_cast<int>(vectorLayers_.size())) return false;
+    const VectorGeometry &g = vectorLayers_[static_cast<size_t>(layerIndex)]->geom;
+    // [0,1] RGBA → #AARRGGBB 无符号打包（四舍五入 + 鈐位 [0,255]）
+    auto pack = [](const float *c) -> unsigned int {
+        auto ch = [](float v) -> unsigned int {
+            int q = static_cast<int>(v * 255.0f + 0.5f);
+            if (q < 0) q = 0;
+            if (q > 255) q = 255;
+            return static_cast<unsigned int>(q);
+        };
+        return (ch(c[3]) << 24) | (ch(c[0]) << 16) | (ch(c[1]) << 8) | ch(c[2]);
+    };
+    for (const auto &pp : g.pickPrims) {
+        if (pp.fid != fid) continue;
+        outFillArgb = pack(pp.renderFill);
+        outLineArgb = pack(pp.renderLine);
+        return true;
+    }
+    return false;
 }
 
 bool GlobeEngine::pickVector(double sxPx, double syPx, int &outLayerIndex, long long &outFid) const {

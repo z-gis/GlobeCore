@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "携带 prebuilt-libs zip 的 Release tag（如 v0.1.1.0）"
+        description: "携带 prebuilt-libs zip 的 Release tag（如 v0.1.2.0）"
         required: true
-        default: "v0.1.1.0"
+        default: "v0.1.2.0"
   push:
     tags: ["v*"]
 

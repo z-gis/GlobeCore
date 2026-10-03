@@ -11,6 +11,7 @@
 #ifndef GLOBECORE_OHOS_EGLCONTEXT_H
 #define GLOBECORE_OHOS_EGLCONTEXT_H
 
+#include <atomic>
 #include <condition_variable>
 #include <cstdint>
 #include <functional>
@@ -125,6 +126,10 @@ private:
     bool frameDirty_ = false; // 请求一帧重绘
     int32_t width_ = 0;      // 最近一次 setSurfaceSize 的视口宽高
     int32_t height_ = 0;
+    // 活动兜底帧窗口截止时刻（steady_clock ns）：requestRender/setSurfaceSize 等任意外部线程
+    // 刷新，渲染线程读取。窗口内以 ~60fps 连续出帧，承接「晚就绪的标注/测点」——对齐 GLSurfaceView
+    // 的续帧兜底；到点且无其它帧源时回到 WHEN_DIRTY 无限休眠（静止零重绘）。不经 mtx_，故用 atomic。
+    std::atomic<int64_t> activeUntilNs_{0};
 
     // 惯性滑动状态（mtx_ 保护）：速度单位 vp/s；lastFlingNs_ 为上一推进时刻（steady_clock ns）
     double flingVx_ = 0.0;

@@ -29,6 +29,10 @@ data class VectorStyle(
     val pointColor: Int = DEFAULT_LINE_COLOR,
     /** 点要素屏幕固定半径（dp，不随缩放变化） */
     val pointRadiusDp: Float = 5.0f,
+    /** 整层是否显式设了面填充色：true 时覆盖 KML 逐要素原色；默认 false（保留源文件配色） */
+    val fillExplicit: Boolean = false,
+    /** 整层是否显式设了线/描边色：true 时覆盖 KML 逐要素原色；默认 false（保留源文件配色） */
+    val lineExplicit: Boolean = false,
     /** 标注字段名：空则整层不标注（对齐主界面门控） */
     val labelField: String = "",
     /** 标注文字色（#AARRGGBB，默认白） */
@@ -39,6 +43,12 @@ data class VectorStyle(
     val labelOutline: Boolean = false,
     /** 标注轮廓色（#AARRGGBB，默认黑） */
     val labelOutlineColor: Int = 0xFF000000.toInt(),
+    /**
+     * 单要素样式覆盖串（文档层 featureStyles 下传）：条目以 ';' 分隔，每条目 `fid,fillArgb,lineArgb`，
+     * fillArgb/lineArgb 为 #AARRGGBB 无符号十进制，'-'/空 表示该通道未显式设过。空串=无单要素覆盖。
+     * native 解析后逐要素按 fid 命中，优先级高于整层色与 KML 原色（见 VectorBuilder::buildOne）。
+     */
+    val featureStyleOverride: String = "",
 ) {
     companion object {
         /** 面填充默认色：半透明蓝 (0.29,0.56,0.89,0.4) → #AARRGGBB，对齐 native VectorStyle 默认 */

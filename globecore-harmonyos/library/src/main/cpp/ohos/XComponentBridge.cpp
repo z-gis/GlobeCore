@@ -321,10 +321,13 @@ void XComponentBridge::handleTouch(const OH_NativeXComponent_TouchEvent &ev) {
             if (host_) host_->cancelPendingLongPress(); // 抬离/取消：长按候选不再成立
             if (!canceled && !gDragging_ && !gPinching_ && n == 1) {
                 const double moved = std::fabs(ux - gDownX_) + std::fabs(uy - gDownY_);
-                // 双击放大已移除：短按未移动且本次序列未触发长按，即为单击，直接投递确认
+                // 双击放大已移除：单指原地抬起即为单击，直接投递确认
                 //（deadline 传当前时刻，渲染线程下一帧触发回调；经 host 通路转投 ArkTS 主线程）。
-                if (moved < kTouchSlop && !gLongPressFired_) {
-                    if (host_) host_->postPendingTap(ux, uy, steadyNowNs());
+                // 不再以 !gLongPressFired_ 否决：当前长按 handleLongPress 是空实现（TODO），若让它
+                // 抑制单击，会把「原地按住稍久（≥长按时长）的正常点击」吞掉——测量时用户常瞄得久，
+                // 表现为首个测点无反应、连点几下（变快）才生效。长按功能真正实现后，应由长按自身决定消费/抑制。
+                if (moved < kTouchSlop && host_ != nullptr) {
+                    host_->postPendingTap(ux, uy, steadyNowNs());
                 }
             }
             // 惯性滑动：纯单指拖动松手且窗口速度达标时，把初速度交给渲染线程逐帧衰减推进

@@ -18,6 +18,12 @@
 
 namespace globecore {
 
+// ── 构建核对 ID（手工维护，用于判别 HAR 是否真正重建并生效）────────────────
+// 每次准备重建 HAR 前，把 GLOBECORE_BUILD_ID 改成一个全新的唯一串（例如末尾序号 +1，或带上你自定义的标记）。
+// 装机日志出现该串 = 跑的确实是你这次改过、并重新构建 + 重新链接的 HAR；
+// 未出现 / 仍是旧串 = app 还在用旧 HAR（引擎源码根本没进设备）。改完务必：重建 HAR → app Sync/ohpm 重新链接 → 卸载重装。
+#define GLOBECORE_BUILD_ID "v0.1.2-20261002-005"
+
 namespace {
 
 // ── 占位（纯色）着色器：世界坐标顶点 + 颜色，正交投影输出 ──────────────────────
@@ -937,6 +943,8 @@ void Renderer::onSurfaceCreated() {
     glClearColor(0.05f, 0.08f, 0.12f, 1.0f);
     // 纹理上下文的 GL 状态在绘制时按需设置
     LOGI("Renderer::onSurfaceCreated ok");
+    // 构建核对：打印手工维护的 GLOBECORE_BUILD_ID（定义见本文件顶部），用于确认装机的是否为本次重建的 HAR。
+    LOGI("globecore build id = %s", GLOBECORE_BUILD_ID);
 }
 
 void Renderer::onSurfaceChanged(int width, int height) {
@@ -1955,27 +1963,31 @@ void Renderer::drawVectorLabels(double cwx, double cwy, double hw, const Matrix4
     // 排版结果按层缓存在 [VectorLayer::labelLayouts]（烘焙像素单位，与缩放/相机无关）：
     // 免每帧全量 UTF-8 解码 + 字形查表（轮廓层每帧重复 9 趟，是标注层卡顿主因）；
     // 仅余每帧必要的坐标变换（乘 ws + 平移）。锚点水平居中、垂直居中于锚点。
+    // 把一个矢量层的全部标注字形四边形追加到 verts：逐条按 LabelItem 自带样式（色/字号/轮廓）绘制，
+    // [outline]=true 画轮廓（仅该条启用轮廓才画、用其轮廓色），否则画文字主体（用其文字色）。
+    // 排版结果按层缓存在 [VectorLayer::labelLayouts]（烘焙像素单位，与缩放/相机无关）：
+    // 免每帧全量 UTF-8 解码 + 字形查表；仅余每帧必要的坐标变换（乘 ws + 平移）。锚点水平/垂直居中。
     auto appendLayer = [&](std::vector<float> &verts, VectorLayer &vl,
-                           float offX, float offY, float dx, float dy,
-                           float cr, float cg, float cb, float ca) {
-        const VectorStyle &s = vl.style;
-        // 期望文字像素高（屏幕恒定）：16dp × density × labelSize；每烘焙像素 → 世界单位
-        const float ws = (16.0f * density * s.labelSize) / bakePx * worldPerPx;
-        if (ws <= 0.0f) return;
+                           float offX, float offY, float dx, float dy, bool outline) {
         for (size_t idx = 0; idx < vl.geom.labels.size(); ++idx) {
             const LabelItem &li = vl.geom.labels[idx];
+            if (outline && !li.outline) continue; // 仅该条启用轮廓时画轮廓
+            // 期望文字像素高（屏幕恒定）：16dp × density × 逐条字号；每烘焙像素 → 世界单位
+            const float ws = (16.0f * density * li.size) / bakePx * worldPerPx;
+            if (ws <= 0.0f) continue;
             const VectorLayer::LabelLayout *lay = ensureLabelLayout(vl, idx);
             if (lay == nullptr) continue;
+            const float *col = outline ? li.outlineColor : li.color;
             // 锚点（相机相对世界坐标，含 RTC 偏移与轮廓偏移）+ 世界单位/烘焙像素比例 ws
             emitLabelQuads(*lay, li.x + offX + dx, li.y + offY + dy, ws, vCenterPx,
-                           cr, cg, cb, ca, verts);
+                           col[0], col[1], col[2], col[3], verts);
         }
     };
 
     // 相机整数级别：级别不足隐藏的层其标注一并隐藏（与填充/描边同进同退，免出现无体只剩字的幽灵标注）。
     const int camLevel = nav_.displayLevel();
 
-    // Pass 1：轮廓（poor-man's：8 方向偏移描边色，仅对启用轮廓的层），画在文字之下
+    // Pass 1：轮廓（poor-man's：8 方向偏移描边色），画在文字之下。逐条判轮廓开关，层内无任一启用轮廓则跳过 8 趟。
     std::vector<float> outlineVerts;
     const float o = 1.0f * density * worldPerPx; // 轮廓偏移 ≈ 1dp（世界单位）
     static const float kDir[8][2] = {
@@ -1984,13 +1996,14 @@ void Renderer::drawVectorLabels(double cwx, double cwy, double hw, const Matrix4
     };
     for (const auto &vlp : vectorLayers_) {
         VectorLayer &vl = *vlp;
-        if (!vectorLayerShown(vl, camLevel) || vl.geom.labels.empty() || !vl.style.labelOutline) continue;
+        if (!vectorLayerShown(vl, camLevel) || vl.geom.labels.empty()) continue;
+        bool anyOutline = false;
+        for (const auto &li : vl.geom.labels) if (li.outline) { anyOutline = true; break; }
+        if (!anyOutline) continue;
         const float offX = static_cast<float>(vl.geom.originWx - cwx);
         const float offY = static_cast<float>(vl.geom.originWy - cwy);
         for (const auto &d : kDir) {
-            appendLayer(outlineVerts, vl, offX, offY, d[0] * o, d[1] * o,
-                        vl.style.labelOutlineR, vl.style.labelOutlineG,
-                        vl.style.labelOutlineB, vl.style.labelOutlineA);
+            appendLayer(outlineVerts, vl, offX, offY, d[0] * o, d[1] * o, true);
         }
     }
 
@@ -2001,8 +2014,7 @@ void Renderer::drawVectorLabels(double cwx, double cwy, double hw, const Matrix4
         if (!vectorLayerShown(vl, camLevel) || vl.geom.labels.empty()) continue;
         const float offX = static_cast<float>(vl.geom.originWx - cwx);
         const float offY = static_cast<float>(vl.geom.originWy - cwy);
-        appendLayer(fillVerts, vl, offX, offY, 0.0f, 0.0f,
-                    vl.style.labelR, vl.style.labelG, vl.style.labelB, vl.style.labelA);
+        appendLayer(fillVerts, vl, offX, offY, 0.0f, 0.0f, false);
     }
 
     if (outlineVerts.empty() && fillVerts.empty()) return;
@@ -2016,6 +2028,12 @@ void Renderer::drawVectorLabels(double cwx, double cwy, double hw, const Matrix4
 
     textProgram_.use();
     glUniformMatrix4fv(txUMvp_, 1, GL_FALSE, ortho.data());
+    // 文字为纯屏幕叠加：显式关深度测试（对齐 drawVectorLabels3D 已有做法）。原 2D 注释虽声明「关深度」
+    // 却漏了调用；2D 主循环不清深度缓冲，本 pass 沿用进入时的深度测试残留态 → 与共面填充面同 z(0)
+    // 的标注被深度剔除（面积标注时有时无即此因；距离/点无共面大面故不受影响）。收尾按进入时状态精确复位。
+    GLboolean depthBefore = GL_FALSE;
+    glGetBooleanv(GL_DEPTH_TEST, &depthBefore);
+    glDisable(GL_DEPTH_TEST);
     glActiveTexture(GL_TEXTURE0);
     glUniform1i(txUTexture_, 0);
     atlasTex_.bind();
@@ -2046,6 +2064,7 @@ void Renderer::drawVectorLabels(double cwx, double cwy, double hw, const Matrix4
     glDisableVertexAttribArray(txAColor_);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glDisable(GL_BLEND);
+    if (depthBefore) glEnable(GL_DEPTH_TEST); // 复位进入本 pass 前的深度态，不外泄
 }
 
 void Renderer::drawVectorIcons(double cwx, double cwy, double hw, const Matrix4 &ortho) {
@@ -2978,13 +2997,13 @@ void Renderer::drawVectorLabels3D(const Navigator::Camera3D &cam, const Matrix4 
     for (const auto &vlp : vectorLayers_) {
         VectorLayer &vl = *vlp;
         if (!vectorLayerShown(vl, camLevel) || vl.geom.labels.empty()) continue;
-        // 屏幕像素/烘焙像素比例：使文字屏幕高 = 16dp×density×labelSize（与 2D 同口径，不随缩放变）
-        const float sPx = (16.0f * density * vl.style.labelSize) / bakePx;
-        if (sPx <= 0.0f) continue;
         const double ox = vl.geom.originWx;
         const double oy = vl.geom.originWy;
         for (size_t idx = 0; idx < vl.geom.labels.size(); ++idx) {
             const LabelItem &li = vl.geom.labels[idx];
+            // 屏幕像素/烘焙像素比例：使文字屏幕高 = 16dp×density×逐条字号（与 2D 同口径，不随缩放变）
+            const float sPx = (16.0f * density * li.size) / bakePx;
+            if (sPx <= 0.0f) continue;
             const VectorLayer::LabelLayout *lay = ensureLabelLayout(vl, idx);
             if (lay == nullptr) continue;
             // 锚点（相对图层原点世界坐标）→ ECEF（贴球面 alt=0）
@@ -2996,14 +3015,14 @@ void Renderer::drawVectorLabels3D(const Navigator::Camera3D &cam, const Matrix4 
             if (p.x * toEye.x + p.y * toEye.y + p.z * toEye.z <= 0.0) continue;
             float axp, ayp;
             if (!projectEcef3D(cam, viewProjRtc, p, axp, ayp)) continue; // 相机背后/近平面外
-            if (vl.style.labelOutline) {
+            if (li.outline) {
                 for (const auto &d : kDir)
                     emitLabelQuads(*lay, axp + d[0] * o, ayp + d[1] * o, sPx, vCenterPx,
-                                   vl.style.labelOutlineR, vl.style.labelOutlineG,
-                                   vl.style.labelOutlineB, vl.style.labelOutlineA, outlineVerts);
+                                   li.outlineColor[0], li.outlineColor[1],
+                                   li.outlineColor[2], li.outlineColor[3], outlineVerts);
             }
             emitLabelQuads(*lay, axp, ayp, sPx, vCenterPx,
-                           vl.style.labelR, vl.style.labelG, vl.style.labelB, vl.style.labelA, fillVerts);
+                           li.color[0], li.color[1], li.color[2], li.color[3], fillVerts);
         }
     }
 

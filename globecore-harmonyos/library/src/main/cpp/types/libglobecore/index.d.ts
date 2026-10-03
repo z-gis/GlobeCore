@@ -37,8 +37,10 @@ interface GlobeCore {
     fillColor: number, outlineColor: number, outlineWidth: number,
     lineColor: number, lineWidth: number,
     pointColor: number, pointRadiusDp: number,
+    fillExplicit: boolean, lineExplicit: boolean,
     labelField: string, labelColor: number, labelSize: number,
     labelOutline: boolean, labelOutlineColor: number,
+    featureStyleOverride: string,
     iconArgb: Int32Array | undefined | null, iconW: number, iconH: number,
     hasExtent: boolean, minLon: number, minLat: number, maxLon: number, maxLat: number,
     maxFeatures: number): number;

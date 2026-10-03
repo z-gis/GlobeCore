@@ -109,6 +109,20 @@ bool EglContext::swapBuffers() {
 
 // ───────────────────────────── MapRenderHost ─────────────────────────────
 
+namespace {
+inline int64_t steadyNowNs() {
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+constexpr double kFlingStopVpPerSec = 20.0; // 低于此速度停止（vp/s）
+constexpr double kFlingDecayPerSec = 6.0;   // 指数衰减时间常数≈167ms，0.7s 内收敛到停止阈值
+// 活动兜底帧窗口：任一 requestRender（手势/fling/尺寸/点击长按/引擎异步就绪）刷新截止时刻，
+// 渲染线程在窗口内以 ~60fps 连续出帧，确保「晚就绪的标注/测点」被画出并呈现（对齐 GLSurfaceView
+// 续帧兜底）；窗口到点且无其它帧源时回到 WHEN_DIRTY 无限休眠（静止零重绘，省电不变）。
+constexpr int64_t kQuietWindowNs = 500LL * 1000 * 1000; // 活动后兜底出帧时长 500ms
+constexpr int64_t kActiveTickMs = 16;                    // 窗口内 ~60fps 节拍（ms）
+} // namespace
+
 MapRenderHost::MapRenderHost(globecore::GlobeEngine *engine, OHNativeWindow *window)
     : engine_(engine), window_(window) {
     // 「需重绘」回调接本宿主脏标记：对应 Android nativeSetRenderCallback 的反射 requestRender，
@@ -129,6 +143,8 @@ MapRenderHost::~MapRenderHost() {
 }
 
 void MapRenderHost::requestRender() {
+    // 刷新活动兜底窗口：本次起 kQuietWindowNs 内连续出帧，承接晚就绪的标注/测点
+    activeUntilNs_.store(steadyNowNs() + kQuietWindowNs);
     {
         std::lock_guard<std::mutex> lock(mtx_);
         frameDirty_ = true;
@@ -145,17 +161,9 @@ void MapRenderHost::setSurfaceSize(int32_t width, int32_t height) {
         sizeDirty_ = true;
         frameDirty_ = true; // 尺寸变化必然重绘（对齐 GLSurfaceView.onSurfaceChanged 后刷帧）
     }
+    activeUntilNs_.store(steadyNowNs() + kQuietWindowNs); // 新 surface：兜底窗口内连续出帧，确保首帧落屏
     cv_.notify_all();
 }
-
-namespace {
-inline int64_t steadyNowNs() {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::steady_clock::now().time_since_epoch()).count();
-}
-constexpr double kFlingStopVpPerSec = 20.0; // 低于此速度停止（vp/s）
-constexpr double kFlingDecayPerSec = 6.0;   // 指数衰减时间常数≈167ms，0.7s 内收敛到停止阈值
-} // namespace
 
 void MapRenderHost::startFling(double vxVpPerSec, double vyVpPerSec) {
     {
@@ -236,7 +244,10 @@ void MapRenderHost::checkPendingTap(int64_t nowNs) {
     float y = 0.0f;
     {
         std::lock_guard<std::mutex> lock(mtx_);
-        if (!pendingTap_ || nowNs < pendingTapDeadlineNs_) return;
+        if (!pendingTap_) return;
+        if (nowNs < pendingTapDeadlineNs_) {
+            return; // 到点前不出击，下轮重算超时
+        }
         pendingTap_ = false;
         cb = singleTapCb_; // 锁内拷贝，锁外触发（回调可能进 NAPI/ArkTS，不可持锁）
         x = pendingTapX_;
@@ -279,6 +290,10 @@ void MapRenderHost::renderLoop() {
             // 两者皆无时回到 WHEN_DIRTY 的无限休眠（零空转）。
             int64_t timeoutMs = -1;
             if (flingVx_ != 0.0 || flingVy_ != 0.0) timeoutMs = 16;
+            // 活动兜底窗口未到期：以 ~60fps 节拍到点唤醒，承接晚就绪的标注/测点（无脏标记亦出帧）
+            if (steadyNowNs() < activeUntilNs_.load()) {
+                timeoutMs = (timeoutMs < 0) ? kActiveTickMs : std::min(timeoutMs, kActiveTickMs);
+            }
             if (pendingTap_) {
                 int64_t remainMs = (pendingTapDeadlineNs_ - steadyNowNs() + 999999) / 1000000;
                 if (remainMs < 0) remainMs = 0;
@@ -289,11 +304,17 @@ void MapRenderHost::renderLoop() {
                 if (remainMs < 0) remainMs = 0;
                 timeoutMs = (timeoutMs < 0) ? remainMs : std::min(timeoutMs, remainMs);
             }
+            // 唤醒谓词须包含待确认单击/长按：地图静止时本线程进入无限休眠，此时
+            // 触摸层 postPendingTap/postPendingLongPress 仅 notify_all——若谓词只看脏帧/尺寸/退出，
+            // 通知后谓词仍为 false 会立刻重新入睡，checkPendingTap 永不执行（表现为「点击无反馈、
+            // 测量形不成面」）。把两个 pending 标志纳入谓词，notify 才能真正打断休眠回到循环顶重算超时。
+            const auto wake = [this] {
+                return quit_ || sizeDirty_ || frameDirty_ || pendingTap_ || pendingLongPress_;
+            };
             if (timeoutMs < 0) {
-                cv_.wait(lock, [this] { return quit_ || sizeDirty_ || frameDirty_; });
+                cv_.wait(lock, wake);
             } else {
-                cv_.wait_for(lock, std::chrono::milliseconds(timeoutMs),
-                             [this] { return quit_ || sizeDirty_ || frameDirty_; });
+                cv_.wait_for(lock, std::chrono::milliseconds(timeoutMs), wake);
             }
             quit = quit_;
             if (!quit) {
@@ -307,18 +328,21 @@ void MapRenderHost::renderLoop() {
             }
         }
         if (quit) break;
+        const int64_t nowNs = steadyNowNs();
         if (w > 0 && h > 0) {
             engine_->surfaceChanged(w, h);
             sizeApplied = true;
         }
+        // 兜底窗口内：即便本轮无脏标记也强制出帧，确保标注/测点晚就绪后立刻被画出并呈现
+        if (nowNs < activeUntilNs_.load()) draw = true;
         if (draw && sizeApplied) {
             engine_->drawFrame(); // 引擎内部可能同步回调 requestRender → 下轮唤醒，天然形成续帧
             if (!egl_.swapBuffers()) {
                 LOGE("eglSwapBuffers failed: 0x%x", eglGetError());
+                activeUntilNs_.store(nowNs + kQuietWindowNs); // 呈现失败：刷新兜底窗口，按节拍重试落屏
             }
         }
         // 帧后推进自驱动动画：惯性未停则续请一帧；单击/长按到点则触发回调（均不持锁执行）
-        const int64_t nowNs = steadyNowNs();
         if (advanceFling(nowNs)) {
             requestRender();
         }

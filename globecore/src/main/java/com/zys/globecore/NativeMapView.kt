@@ -257,7 +257,9 @@ class NativeMapView @JvmOverloads constructor(
         val index = if (h != 0L) NativeLib.nativeAddVectorLayer(
             h, path, style.fillColor, style.outlineColor, style.outlineWidth,
             style.lineColor, style.lineWidth, style.pointColor, style.pointRadiusDp,
+            style.fillExplicit, style.lineExplicit,
             style.labelField, style.labelColor, style.labelSize, style.labelOutline, style.labelOutlineColor,
+            style.featureStyleOverride,
             iconArgb, iconW, iconH,
             extent != null,
             extent?.minLon ?: 0.0, extent?.minLat ?: 0.0,
@@ -466,6 +468,19 @@ class NativeMapView @JvmOverloads constructor(
         val ringCounts = IntArray(res[1].size) { res[1][it].toInt() }
         val ringsPerFeature = IntArray(res[2].size) { res[2][it].toInt() }
         return FeatureGeometry(type, res[3], ringCounts, ringsPerFeature)
+    }
+
+    /**
+     * 取指定矢量层某 FID 要素的当前实际渲染色，供宿主点击要素弹层色块「所见即所得」回显（尤其 KML
+     * 逐要素原色——app 无从复现，仅 native 建几何时按三级优先级算定）。命中返回 `[fillArgb, lineArgb]`
+     *（均为 #AARRGGBB 打包 Int，可直接供 Android [android.graphics.Color] 使用），未命中返回 null。
+     * 仅读 native CPU 几何、不涉 GL，可在主线程调用。
+     */
+    fun featureRenderColor(layerIndex: Int, fid: Long): IntArray? {
+        val h = nativeHandle
+        if (h == 0L) return null
+        val c = NativeLib.nativeFeatureRenderColor(h, layerIndex, fid) ?: return null
+        return if (c.size >= 2) c else null
     }
 
     /**

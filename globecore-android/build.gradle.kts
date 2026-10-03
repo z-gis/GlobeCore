@@ -40,7 +40,7 @@ dependencies {
     // 演示应用与库同仓，直接用 project 依赖（外部宿主按仓库根 README「在宿主 App 中集成」以 AAR 集成）
     implementation(project(":globecore"))
     // 库模块改名后的坐标 com.zys:globecore 尚未发布到 gh-pages:/maven，发布后可切回此行：
-    //implementation("com.zys:globecore:0.1.1.0")
+    //implementation("com.zys:globecore:0.1.2.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
