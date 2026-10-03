@@ -47,13 +47,13 @@ jobs:
             echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up OpenHarmony command-line tools (provides ohpm)
+        # 公共 npm 上没有 @ohos/ohpm-cli（旧步骤 npm install 会 404）；改用社区 setup-ohos
+        # 从免登录镜像拉取 command-line-tools（含 ohpm/hvigor），发布 HAR 只需其中的 ohpm。
+        uses: ErBWs/setup-ohos@v2
         with:
-          node-version: "20"
-
-      - name: Install ohpm CLI (headless, publish-only)
-        run: npm install -g @ohos/ohpm-cli && ohpm -v
+          version: 6.1.1.280
+          cache: true
 
       - name: Configure ohpm publish registry
         run: ohpm config set publish_registry https://ohpm.openharmony.cn/ohpm/
