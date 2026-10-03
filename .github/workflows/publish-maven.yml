@@ -108,13 +108,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          # 行尾一致性审计：index 与 worktree 字节不同会让 Gradle 校验和不匹配
+          # 行尾一致性审计：index 与 worktree 的 EOL 类型不同会让 Gradle 校验和失配
           bad=0
-          while IFS= read -r line; do
-            iw=$(printf '%s' "$line" | sed -E 's/.*(i\/[^ ]+) (w\/[^ ]+).*/\1 \2/')
-            i_eol=$(printf '%s' "$iw" | awk '{print $1}')
-            w_eol=$(printf '%s' "$iw" | awk '{print $2}')
-            if [ "$i_eol" != "$w_eol" ]; then echo "EOL mismatch: $line"; bad=1; fi
+          while IFS= read -r f1 f2 rest; do
+            ie=${f1#i/}; we=${f2#w/}
+            if [ -n "$f1" ] && [ "$ie" != "$we" ]; then echo "EOL mismatch ($ie vs $we): $rest"; bad=1; fi
           done < <(git ls-files --eol | grep -E 'aar|pom|module|metadata|sources' || true)
           [ "$bad" -eq 0 ] || { echo "aborting to keep checksums valid" >&2; exit 1; }
 
