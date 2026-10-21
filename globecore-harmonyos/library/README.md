@@ -26,7 +26,7 @@ NativeNet.initCaBundle(context);
 
 ## 版本
 
-`0.1.2`
+`0.1.4`
 
 ## 许可
 

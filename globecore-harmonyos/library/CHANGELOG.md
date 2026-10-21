@@ -2,6 +2,16 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.1.4]
+
+### Added
+- GeoPackage 工程读写鸿蒙侧 NAPI 桥（`NativeGpkg`、`napi_geopackage.cpp`），与 Android 端对齐。
+- 新增 `NativeTiles` 瓦片缓存辅助导出。
+
+### Changed
+- CMake 补齐 `bridge/geopackage_core.cpp` 引擎共享源。
+- `index.d.ts` 补 GeoPackage / 瓦片相关类型声明。
+
 ## [0.1.3]
 
 ### Changed

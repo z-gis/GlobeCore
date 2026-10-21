@@ -14,6 +14,7 @@ napi_value RegisterSrs(napi_env env, napi_value exports);
 napi_value RegisterGdalInfo(napi_env env, napi_value exports);
 napi_value RegisterLayerInfo(napi_env env, napi_value exports);
 napi_value RegisterVectorIo(napi_env env, napi_value exports);
+napi_value RegisterGeoPackage(napi_env env, napi_value exports);
 
 // ── OH_NativeXComponent 取组件逻辑 ──
 // 官方方式：XComponent(libraryname) 加载时 ArkUI 在 exports 上设置 OH_NATIVE_XCOMPONENT_OBJ
@@ -48,6 +49,7 @@ napi_value Init(napi_env env, napi_value exports) {
     RegisterGdalInfo(env, exports);
     RegisterLayerInfo(env, exports);
     RegisterVectorIo(env, exports);
+    RegisterGeoPackage(env, exports);
     // 缓存 exports 引用，XComponent 加载后 ResolveNativeXComponent 可通过它取组件
     napi_create_reference(env, exports, 1, &g_exportsRef);
     // 此后每次 XComponent 的 onLoad → nativeAttach 时现取当前组件（不缓存，防跨实例野指针）

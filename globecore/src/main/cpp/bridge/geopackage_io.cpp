@@ -227,7 +227,8 @@ static bool writeGeoPackage(const std::string &filePath, const std::string &proj
     // ---- tracks 图层 ----
     {
         OGRSpatialReference *srs = makeWgs84();
-        OGRLayer *layer = ds->CreateLayer("tracks", srs, wkbLineString, nullptr);
+        // 几何均为三维（点列含 alt）：必须建 25D 层，否则 gpkg_geometry_columns.z 落成 0，与实际 blob 不符
+        OGRLayer *layer = ds->CreateLayer("tracks", srs, wkbLineString25D, nullptr);
         srs->Release();
         if (layer != nullptr) {
             createLayerFields(layer, {
@@ -337,7 +338,8 @@ static bool writeGeoPackage(const std::string &filePath, const std::string &proj
         }
 
         OGRSpatialReference *srs = makeWgs84();
-        OGRLayer *layer = ds->CreateLayer("photos", srs, wkbPoint, nullptr);
+        // 拍照点位几何带 alt：同 tracks，建 25D 层让 z 声明正确
+        OGRLayer *layer = ds->CreateLayer("photos", srs, wkbPoint25D, nullptr);
         srs->Release();
         if (layer != nullptr) {
             createLayerFields(layer, {

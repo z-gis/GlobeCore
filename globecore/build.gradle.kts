@@ -3,7 +3,7 @@ plugins {
     id("maven-publish")
 }
 
-// globecore 库版本与 Maven 坐标：与 GitHub Release tag（v0.1.3.0）保持一致
+// globecore 库版本与 Maven 坐标：与 GitHub Release tag 保持一致
 group = "com.zys"
 version = "0.1.4.0"
 

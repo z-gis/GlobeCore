@@ -126,6 +126,58 @@ interface GlobeCore {
   nativeCountVectorFeatures(path: string): number;
   nativeUpdateFeatureAttributes(path: string, featureId: number, keys: string[], values: string[]): boolean;
   nativeGetFeatureAttributes(path: string, featureId: number): string | null;
+
+  // ── GeoPackage 工程数据读写（bridge/geopackage_core，JSON 与 Android 侧逐字节同构）──
+  /// 读工程：返回与 Android Project.fromJson 兼容的 JSON；打不开/结构不符 null
+  nativeReadGeoPackage(path: string): string | null;
+  /// 整写工程（新建 + 老库 schema 升级共用；内部 tmp+rename 原子替换）
+  nativeWriteGeoPackage(path: string, json: string): boolean;
+  /// 业务七表与增量写所需列是否齐备（文件不存在 true，由新建流程负责建库）
+  nativeGpkgSchemaCurrent(path: string): boolean;
+  /// 写前准备（幂等）：补建附件 BLOB 附加表 photo_att_data
+  nativeGpkgPrepareSchema(path: string): boolean;
+
+  // ── GeoPackage 增量写（键与 Android 工程 JSON 逐字一致；id<=0 自动编号）──
+  /// json: {"id","name","date","color","hidden","lineWidth","points":[[lon,lat,alt],...]}；返回 fid，失败 -1
+  nativeGpkgInsertTrack(path: string, json: string): number;
+  /// json: {"name","color","hidden","lineWidth"}（几何不动）
+  nativeGpkgUpdateTrack(path: string, id: number, json: string): boolean;
+  nativeGpkgDeleteTrack(path: string, id: number): boolean;
+  /// json: {"id","name","date","type","result","color","hidden","closed","lineWidth","points"}
+  /// type=point→点，area/polygon→面，其余→线；返回 fid，失败 -1
+  nativeGpkgInsertMeasure(path: string, json: string): number;
+  /// json: {"color","lineWidth"}（对齐 Android updateMeasureStyle）
+  nativeGpkgUpdateMeasure(path: string, id: number, json: string): boolean;
+  nativeGpkgDeleteMeasure(path: string, id: number): boolean;
+  /// json: {"id","name","lon","lat","alt","timestamp","visible","groupId"}；返回 fid，失败 -1
+  nativeGpkgInsertPhoto(path: string, json: string): number;
+  /// json 键出现才更新：{"name"?,"groupId"?,"visible"?,"attachments"?,"photo_path"?}
+  /// attachments 可传 string（原样存列）或数组（序列化存列）；空串写 NULL
+  nativeGpkgUpdatePhoto(path: string, id: number, json: string): boolean;
+  /// 删除照片（连同 photo_att_data 附件行）
+  nativeGpkgDeletePhoto(path: string, id: number): boolean;
+  /// 写照片 BLOB：idx=0 主照片 photos.photo_data；idx>=1 附件 photo_att_data（INSERT OR REPLACE）
+  nativeGpkgAddPhotoAttachment(path: string, fid: number, idx: number, data: ArrayBuffer): boolean;
+  /// 读照片 BLOB：idx=0 主照片，idx>=1 附件；无记录 null
+  nativeGpkgReadPhotoBlob(path: string, fid: number, idx: number): ArrayBuffer | null;
+  /// json: {"id","name","createdTime","visible"}（fid 即 id）
+  nativeGpkgInsertGroup(path: string, json: string): boolean;
+  /// json: {"id","name"}
+  nativeGpkgUpdateGroup(path: string, json: string): boolean;
+  /// 删除分组：组内照片移到未分组（group_id=-1）
+  nativeGpkgDeleteGroup(path: string, id: number): boolean;
+  /// 分组内照片批量显隐
+  nativeGpkgSetGroupPhotosVisible(path: string, id: number, visible: boolean): boolean;
+  /// 样地 upsert（fid 冲突替换）：{"id","name","plotType","attributes":object|string,"points"}
+  nativeGpkgUpsertSurveyPlot(path: string, json: string): boolean;
+  /// 删除样地（按 fid DeleteFeature）
+  nativeGpkgDeleteSurveyPlot(path: string, id: number): boolean;
+  /// 元数据一把梭：project_meta 五键 upsert（空值删行）+ layer_refs 全替换 + finish 元数据。
+  /// json: {"name"?,"description"?,"srs"?,"createTime"?,"updateTime"?,"layerRefs"?:[string,...]}
+  nativeGpkgSyncMeta(path: string, json: string): boolean;
+  /// 照片文件清扫（幂等）：BLOB 已在库删磁盘原件；BLOB 缺失且原件存在则读入库后删。
+  /// 仅处理 mediaRoot 目录下文件；返回是否发生任何清扫
+  nativeGpkgSweepPhotoFiles(path: string, mediaRoot: string): boolean;
 }
 
 const globeCore: GlobeCore;

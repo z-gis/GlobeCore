@@ -12,7 +12,7 @@
 门面层（`NativeMapView` 等）只做接口转发，相机、瓦片网格、取瓦片与缓存、矢量读取/三角剖分、
 OpenGL ES 2.0 绘制全部在 native 完成，并内联编译了 GDAL/OGR、PROJ、libcurl 全套第三方静态库能力。
 
-当前版本 **0.1.4.0**：GeoPackage 工程读写（`geopackage_io`，七表结构 + JSON 桥接 + 原子写 + SetFID 记录 id 持久化）、着色器精度修复（顶点阶段归一化法向/视线方向，修复真机 3D 光照无过渡问题）、瓦片缓存 MBTiles 单文件后端（含 `added_at` 入库时间列）。tag 后追加（未重新打版）：鸿蒙 HAR 构建补齐引擎源清单（修复 so 链接缺符号）、photos 表新增 `photo_data` BLOB（主照片随工程文件入库）。
+当前版本 **0.1.4.0**：GeoPackage 工程读写（`geopackage_io`，七表结构 + JSON 桥接 + 原子写 + SetFID 记录 id 持久化）、着色器精度修复（顶点阶段归一化法向/视线方向，修复真机 3D 光照无过渡问题）、瓦片缓存 MBTiles 单文件后端（含 `added_at` 入库时间列）。tag 后追加（未重新打版）：鸿蒙 HAR 构建补齐引擎源清单（修复 so 链接缺符号）、photos 表新增 `photo_data` BLOB（主照片随工程文件入库）、鸿蒙侧 GeoPackage NAPI 桥（`NativeGpkg`/`NativeTiles`）与共享引擎源 `geopackage_core`。
 
 ## 它是干什么的
 
@@ -403,13 +403,13 @@ HarmonyOS NEXT（API 12 / 5.0.0，纯血鸿蒙，无 AOSP 兼容层）下引擎�
 
 ### 集成三步曲（对齐 Android 侧口径）
 
-**第一步：引入 HAR** —— 包名 **`@zys/globecore`**。ohpm 仓已发布（当前 0.1.3），宿主 `oh-package.json5` 直接按版本引用：
+**第一步：引入 HAR** —— 包名 **`@zys/globecore`**。ohpm 仓已发布（当前 0.1.4），宿主 `oh-package.json5` 直接按版本引用：
 
 ```json5
 // oh-package.json5
 {
   "dependencies": {
-    "@zys/globecore": "0.1.3"
+    "@zys/globecore": "0.1.4"
   }
 }
 ```

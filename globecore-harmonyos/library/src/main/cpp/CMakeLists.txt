@@ -31,6 +31,9 @@ message(STATUS "globecore-harmonyos: GLOBECORE_ENGINE_ROOT=${GLOBECORE_ENGINE_RO
 
 # 引擎内 #include "core/GlobeEngine.h" 等以引擎根为基准（与 Android 构建完全一致）
 include_directories(${GLOBECORE_ENGINE_ROOT})
+# 本模块 cpp 根：供 ohos/ 源以 "bridge/tile_migrate.h" 形式引用鸿蒙专属桥头（与引擎 bridge/ 同名目录不冲突，
+# 引擎根在前、本目录在后，仅 tile_migrate.* 落在此处——鸿蒙 ArkTS 无任意路径 SQLite API，迁移只能走引擎）
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 # 第三方头（curl/gdal/proj/sqlite/zlib 等），双平台共用同一份
 include_directories(${GLOBECORE_ENGINE_ROOT}/include)
 
@@ -89,6 +92,10 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         ohos/napi_gdal_info.cpp
         ohos/napi_layer_info.cpp
         ohos/napi_vector_io.cpp
+        # GeoPackage 工程数据读写 NAPI 版（核心在引擎 bridge/geopackage_core.cpp，此处薄封装）
+        ohos/napi_geopackage.cpp
+        # 旧目录式瓦片缓存 → 单文件 MBTiles 迁移核心（纯 C++/GDAL，无平台段；对应 Android 平台 SQLite 版）
+        bridge/tile_migrate.cpp
         # ── 引擎源：与 Android CMakeLists 同一清单，仅去掉 jni/ 桥接 ──
         # 顶层渲染引擎 + 相机/导航器
         ${GLOBECORE_ENGINE_ROOT}/core/GlobeEngine.cpp
@@ -142,7 +149,9 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
         ${GLOBECORE_ENGINE_ROOT}/bridge/srs.cpp
         ${GLOBECORE_ENGINE_ROOT}/bridge/gdal_info.cpp
         ${GLOBECORE_ENGINE_ROOT}/bridge/layer_info.cpp
-        ${GLOBECORE_ENGINE_ROOT}/bridge/vector_io.cpp)
+        ${GLOBECORE_ENGINE_ROOT}/bridge/vector_io.cpp
+        # GeoPackage 读/整写/增量写平台无关核心（纯 C++，无 JNI 段；Android 侧 geopackage_io.cpp 不纳入）
+        ${GLOBECORE_ENGINE_ROOT}/bridge/geopackage_core.cpp)
 
 # XComponent 桩生成器感知：本目标直接产出全量引擎库，无需 "世界窗口" 桩 .so
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE GLOBECORE_LIBRARY_FULL)

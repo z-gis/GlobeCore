@@ -10,3 +10,5 @@ export { NativeSrs } from './src/main/ets/NativeSrs';
 export { NativeNet } from './src/main/ets/NativeNet';
 export { NativeLayerInfo } from './src/main/ets/NativeLayerInfo';
 export { NativeVector } from './src/main/ets/NativeVector';
+export { NativeGpkg } from './src/main/ets/NativeGpkg';
+export { NativeTiles } from './src/main/ets/NativeTiles';
