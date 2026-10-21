@@ -109,24 +109,10 @@ libminizip.a  libexpat.a  libz.a  libcurl.a
 > `libcurl.a` 内部已静态打包 OpenSSL 1.1.1w + zlib，无需再单独链
 > libssl/libcrypto。
 
-### 路径 A：下载现成产物（免编译，推荐快速上手）
+### 路径 A：用 build-scripts 一键自行编译（推荐）
 
-本仓库 [Releases](https://github.com/z-gis/GlobeCore/releases) 提供与头文件版本配套的预编译
-产物包 **`globecore-prebuilt-libs-v0.1.0.0.zip`**（约 106MB，含双 ABI 共 28 个 `.a` + 三方头 +
-`assets/proj` 数据，共 290 个文件）。压缩包保持仓库相对路径（顶层 `globecore/...`），在**仓库根
-目录**解压即全部落位，无需本地编译工具链：
-
-```bash
-# 于仓库根目录执行
-curl -LO https://github.com/z-gis/GlobeCore/releases/download/v0.1.0.0/globecore-prebuilt-libs-v0.1.0.0.zip
-unzip globecore-prebuilt-libs-v0.1.0.0.zip   # 产物落入 cpp/jniLibs、cpp/include、assets/proj
-```
-
-> 直链：<https://github.com/z-gis/GlobeCore/releases/download/v0.1.0.0/globecore-prebuilt-libs-v0.1.0.0.zip>
-> 该包由路径 B 的 `build-all.sh` 产出后打包，若你更新了三方库版本，请用路径 B 重编并同步更新 Release。
-> 0.1.1.0 未变更任何三方库版本，该包对 Android 0.1.1.0 依然有效；鸿蒙 `.a` 需另跑路径 B 的 `--target ohos`。
-
-### 路径 B：用 build-scripts 一键自行编译（推荐）
+> **注意**：预编译产物包（`globecore-prebuilt-libs-*.zip`）已停止随版本发布，请使用路径 B 自行编译。
+> 历史版本 v0.1.0.0 曾提供预编译包，但当前版本 0.1.4.0 的三方库可能有更新，建议重新编译以确保兼容性。
 
 脚本位于 **`build-scripts/`**，在 **WSL2 / Linux** 下运行（Windows 直接跑不通）。一次执行即
 **同时产出 x86_64 与 arm64-v8a 两套共 28 个 `.a`**，并自动刷新 `include/` 三方头与
